@@ -1,17 +1,21 @@
 package elasticorm
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 type MappingConfig struct {
 	Type string `json:"type"`
 }
 
-func MappingFromStruct(i interface{}) map[string]map[string]MappingConfig {
+func MappingFromStruct(i interface{}) (map[string]map[string]MappingConfig, error) {
 	mapping := make(map[string]map[string]MappingConfig)
 	mapping[`properties`] = make(map[string]MappingConfig)
+	var err error
 
 	v := reflect.ValueOf(i).Elem()
 	for n := 0; n < v.NumField(); n++ {
@@ -23,8 +27,11 @@ func MappingFromStruct(i interface{}) map[string]map[string]MappingConfig {
 		mappingType := `text`
 		if et := v.Type().Field(n).Tag.Get(`elasticorm`); et != `` {
 			opts := strings.Split(et, `=`)
-			if opts[0] == `type` {
+			switch opts[0] {
+			case `type`:
 				mappingType = opts[1]
+			default:
+				err = errors.Wrap(InvalidOptionErr, fmt.Sprintf("parsing option %s failed", et))
 			}
 		}
 
@@ -33,5 +40,5 @@ func MappingFromStruct(i interface{}) map[string]map[string]MappingConfig {
 		}
 	}
 
-	return mapping
+	return mapping, err
 }
