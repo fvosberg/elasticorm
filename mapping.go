@@ -1,6 +1,9 @@
 package elasticorm
 
-import "reflect"
+import (
+	"reflect"
+	"strings"
+)
 
 type MappingConfig struct {
 	Type string `json:"type"`
@@ -16,8 +19,17 @@ func MappingFromStruct(i interface{}) map[string]map[string]MappingConfig {
 		if jn := v.Type().Field(n).Tag.Get(`json`); jn != `` {
 			name = jn
 		}
+
+		mappingType := `text`
+		if et := v.Type().Field(n).Tag.Get(`elasticorm`); et != `` {
+			opts := strings.Split(et, `=`)
+			if opts[0] == `type` {
+				mappingType = opts[1]
+			}
+		}
+
 		mapping[`properties`][name] = MappingConfig{
-			Type: `text`,
+			Type: mappingType,
 		}
 	}
 
