@@ -9,7 +9,8 @@ import (
 )
 
 type MappingConfig struct {
-	Type string `json:"type"`
+	Type     string `json:"type"`
+	Analyzer string `json:"analyzer,omitempty"`
 }
 
 func MappingFromStruct(i interface{}) (map[string]map[string]MappingConfig, error) {
@@ -25,18 +26,22 @@ func MappingFromStruct(i interface{}) (map[string]map[string]MappingConfig, erro
 		}
 
 		mappingType := `text`
+		var analyzer string
 		if et := v.Type().Field(n).Tag.Get(`elasticorm`); et != `` {
 			opts := strings.Split(et, `=`)
 			switch opts[0] {
 			case `type`:
 				mappingType = opts[1]
+			case `analyzer`:
+				analyzer = opts[1]
 			default:
 				err = errors.Wrap(InvalidOptionErr, fmt.Sprintf("parsing option %s failed", et))
 			}
 		}
 
 		mapping[`properties`][name] = MappingConfig{
-			Type: mappingType,
+			Type:     mappingType,
+			Analyzer: analyzer,
 		}
 	}
 

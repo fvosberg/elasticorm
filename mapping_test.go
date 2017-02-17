@@ -67,6 +67,18 @@ var mappingTestCases []mappingTestCase = []mappingTestCase{
 		ExpectedJSON:  `{"properties":{"date":{"type":"text"},"first_name":{"type":"text"},"last_name":{"type":"text"}}}`,
 		ExpectedError: errors.Wrap(elasticorm.InvalidOptionErr, `parsing option foo=date failed`),
 	},
+	mappingTestCase{
+		Title: `For a struct with elasticorm tag option for analyzer`,
+		Input: func() interface{} {
+			type User struct {
+				FirstName string `json:"first_name"`
+				LastName  string `json:"last_name" elasticorm:"analyzer=simple"`
+			}
+			return &User{}
+		}(),
+		ExpectedJSON:  `{"properties":{"first_name":{"type":"text"},"last_name":{"type":"text","analyzer":"simple"}}}`,
+		ExpectedError: nil,
+	},
 	/*
 		TODO
 		{
