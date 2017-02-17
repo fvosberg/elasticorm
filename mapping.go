@@ -20,30 +20,41 @@ func MappingFromStruct(i interface{}) (map[string]map[string]MappingConfig, erro
 
 	v := reflect.ValueOf(i).Elem()
 	for n := 0; n < v.NumField(); n++ {
-		name := v.Type().Field(n).Name
-		if jn := v.Type().Field(n).Tag.Get(`json`); jn != `` {
-			name = jn
+		fieldMapping, propErr := mappingForField(v.Type().Field(n).Tag.Get(`elasticorm`))
+		if propErr != nil {
+			err = propErr
 		}
-
-		mappingType := `text`
-		var analyzer string
-		if et := v.Type().Field(n).Tag.Get(`elasticorm`); et != `` {
-			opts := strings.Split(et, `=`)
-			switch opts[0] {
-			case `type`:
-				mappingType = opts[1]
-			case `analyzer`:
-				analyzer = opts[1]
-			default:
-				err = errors.Wrap(InvalidOptionErr, fmt.Sprintf("parsing option %s failed", et))
-			}
-		}
-
-		mapping[`properties`][name] = MappingConfig{
-			Type:     mappingType,
-			Analyzer: analyzer,
-		}
+		name := nameForField(v.Type().Field(n))
+		mapping[`properties`][name] = fieldMapping
 	}
 
 	return mapping, err
+}
+
+func mappingForField(tag string) (MappingConfig, error) {
+	var err error
+	propMapping := MappingConfig{
+		Type: `text`,
+	}
+
+	if tag != `` {
+		opts := strings.Split(tag, `=`)
+		switch opts[0] {
+		case `type`:
+			propMapping.Type = opts[1]
+		case `analyzer`:
+			propMapping.Analyzer = opts[1]
+		default:
+			err = errors.Wrap(InvalidOptionErr, fmt.Sprintf("parsing option %s failed", tag))
+		}
+	}
+	return propMapping, err
+}
+
+func nameForField(field reflect.StructField) string {
+	name := field.Name
+	if json := field.Tag.Get(`json`); json != `` {
+		name = json
+	}
+	return name
 }
