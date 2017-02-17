@@ -12,7 +12,11 @@ func MappingFromStruct(i interface{}) map[string]map[string]MappingConfig {
 
 	v := reflect.ValueOf(i).Elem()
 	for n := 0; n < v.NumField(); n++ {
-		mapping[`properties`][v.Type().Field(n).Name] = MappingConfig{
+		name := v.Type().Field(n).Name
+		if jn := v.Type().Field(n).Tag.Get(`json`); jn != `` {
+			name = jn
+		}
+		mapping[`properties`][name] = MappingConfig{
 			Type: `text`,
 		}
 	}
