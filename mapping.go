@@ -54,6 +54,9 @@ func mappingForField(tag string) (MappingConfig, error) {
 func nameForField(field reflect.StructField) string {
 	name := field.Name
 	if json := field.Tag.Get(`json`); json != `` {
+		if i := strings.Index(json, `,`); i > -1 {
+			json = json[:strings.Index(json, `,`)]
+		}
 		name = json
 	}
 	return name

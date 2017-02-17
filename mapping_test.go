@@ -79,6 +79,18 @@ var mappingTestCases []mappingTestCase = []mappingTestCase{
 		ExpectedJSON:  `{"properties":{"first_name":{"type":"text"},"last_name":{"type":"text","analyzer":"simple"}}}`,
 		ExpectedError: nil,
 	},
+	mappingTestCase{
+		Title: `For a struct with json tag with option`,
+		Input: func() interface{} {
+			type User struct {
+				FirstName string `json:"first_name,omitempty"`
+				LastName  string `json:"last_name"`
+			}
+			return &User{}
+		}(),
+		ExpectedJSON:  `{"properties":{"first_name":{"type":"text"},"last_name":{"type":"text"}}}`,
+		ExpectedError: nil,
+	},
 	/*
 		TODO
 		{
