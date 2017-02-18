@@ -10,33 +10,52 @@ import (
 func TestIndexDefinition(t *testing.T) {
 	tests := []struct {
 		title        string
-		def          elasticorm.IndexDefinition
+		defFuncs     []elasticorm.IndexDefinitionFunc
 		expectedJSON string
 	}{
 		{
 			title:        `Empty Index definition`,
-			def:          elasticorm.NewIndexDefinition(),
+			defFuncs:     []elasticorm.IndexDefinitionFunc{},
 			expectedJSON: `{}`,
 		},
 		{
 			title: `Index definition with number of shards setting`,
-			def: elasticorm.NewIndexDefinition(
+			defFuncs: []elasticorm.IndexDefinitionFunc{
 				elasticorm.SetNumberOfShards(3),
-			),
+			},
 			expectedJSON: `{"settings":{"number_of_shards":3}}`,
 		},
 		{
 			title: `Index definition with number of replicas setting`,
-			def: elasticorm.NewIndexDefinition(
+			defFuncs: []elasticorm.IndexDefinitionFunc{
 				elasticorm.SetNumberOfReplicas(2),
-			),
+			},
 			expectedJSON: `{"settings":{"number_of_replicas":2}}`,
+		},
+		{
+			title: `Index definition with a setting and a customer mapping`,
+			defFuncs: []elasticorm.IndexDefinitionFunc{
+				elasticorm.SetNumberOfReplicas(2),
+				elasticorm.AddMappingFromStruct(
+					`customer`,
+					(func() interface{} {
+						type User struct {
+							FirstName string `json:"first_name,omitempty"`
+							LastName  string `json:"last_name"`
+						}
+						return &User{}
+					})(),
+				),
+			},
+			expectedJSON: `{"settings":{"number_of_replicas":2},"mappings":{"customer":{"properties":{"first_name":{"type":"text"},"last_name":{"type":"text"}}}}}`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.title, func(t *testing.T) {
-			actualJSON, err := json.Marshal(tt.def)
+			def, err := elasticorm.NewIndexDefinition(tt.defFuncs...)
+			ok(t, err)
+			actualJSON, err := json.Marshal(def)
 			ok(t, err)
 			equals(t, tt.expectedJSON, string(actualJSON))
 		})
