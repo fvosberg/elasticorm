@@ -9,13 +9,23 @@ import (
 )
 
 type MappingConfig struct {
+	Properties map[string]MappingFieldConfig `json:"properties,omitempty"`
+}
+
+func (m *MappingConfig) AddField(name string, cfg MappingFieldConfig) {
+	if m.Properties == nil {
+		m.Properties = make(map[string]MappingFieldConfig)
+	}
+	m.Properties[name] = cfg
+}
+
+type MappingFieldConfig struct {
 	Type     string `json:"type"`
 	Analyzer string `json:"analyzer,omitempty"`
 }
 
-func MappingFromStruct(i interface{}) (map[string]map[string]MappingConfig, error) {
-	mapping := make(map[string]map[string]MappingConfig)
-	mapping[`properties`] = make(map[string]MappingConfig)
+func MappingFromStruct(i interface{}) (MappingConfig, error) {
+	mapping := MappingConfig{}
 	var err error
 
 	v := reflect.ValueOf(i).Elem()
@@ -25,15 +35,15 @@ func MappingFromStruct(i interface{}) (map[string]map[string]MappingConfig, erro
 			err = propErr
 		}
 		name := nameForField(v.Type().Field(n))
-		mapping[`properties`][name] = fieldMapping
+		mapping.AddField(name, fieldMapping)
 	}
 
 	return mapping, err
 }
 
-func mappingForField(tag string) (MappingConfig, error) {
+func mappingForField(tag string) (MappingFieldConfig, error) {
 	var err error
-	propMapping := MappingConfig{
+	propMapping := MappingFieldConfig{
 		Type: `text`,
 	}
 
