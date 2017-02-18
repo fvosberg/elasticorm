@@ -25,6 +25,13 @@ func TestIndexDefinition(t *testing.T) {
 			),
 			expectedJSON: `{"settings":{"number_of_shards":3}}`,
 		},
+		{
+			title: `Index definition with number of replicas setting`,
+			def: elasticorm.NewIndexDefinition(
+				elasticorm.SetNumberOfReplicas(2),
+			),
+			expectedJSON: `{"settings":{"number_of_replicas":2}}`,
+		},
 	}
 
 	for _, tt := range tests {

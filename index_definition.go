@@ -5,7 +5,8 @@ type IndexDefinition struct {
 }
 
 type indexSettings struct {
-	NumberOfShards int `json:"number_of_shards"`
+	NumberOfShards   int `json:"number_of_shards,omitempty"`
+	NumberOfReplicas int `json:"number_of_replicas,omitempty"`
 }
 
 type IndexDefinitionFunc func(*IndexDefinition)
@@ -24,5 +25,14 @@ func SetNumberOfShards(number int) IndexDefinitionFunc {
 			def.Settings = &indexSettings{}
 		}
 		def.Settings.NumberOfShards = number
+	}
+}
+
+func SetNumberOfReplicas(number int) IndexDefinitionFunc {
+	return func(def *IndexDefinition) {
+		if def.Settings == nil {
+			def.Settings = &indexSettings{}
+		}
+		def.Settings.NumberOfReplicas = number
 	}
 }
