@@ -2,6 +2,7 @@ package elasticorm_test
 
 import (
 	"testing"
+	"time"
 
 	"encoding/json"
 
@@ -65,7 +66,7 @@ var mappingTestCases []mappingTestCase = []mappingTestCase{
 			return &User{}
 		}(),
 		ExpectedJSON:  `{"properties":{"date":{"type":"text"},"first_name":{"type":"text"},"last_name":{"type":"text"}}}`,
-		ExpectedError: errors.Wrap(elasticorm.InvalidOptionErr, `parsing option foo=date failed`),
+		ExpectedError: errors.Wrap(elasticorm.ErrInvalidOption, `parsing option foo=date failed`),
 	},
 	mappingTestCase{
 		Title: `For a struct with elasticorm tag option for analyzer`,
@@ -89,6 +90,18 @@ var mappingTestCases []mappingTestCase = []mappingTestCase{
 			return &User{}
 		}(),
 		ExpectedJSON:  `{"properties":{"first_name":{"type":"text"},"last_name":{"type":"text"}}}`,
+		ExpectedError: nil,
+	},
+	mappingTestCase{
+		Title: `For a struct with multiple elasticorm tag options - for analyzer and type`,
+		Input: func() interface{} {
+			type User struct {
+				FirstName   string     `json:"first_name"`
+				DateOfBirth *time.Time `json:"date" elasticorm:"analyzer=simple,type=date"`
+			}
+			return &User{}
+		}(),
+		ExpectedJSON:  `{"properties":{"date":{"type":"date","analyzer":"simple"},"first_name":{"type":"text"}}}`,
 		ExpectedError: nil,
 	},
 	/*

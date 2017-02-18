@@ -8,10 +8,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+// MappingConfig is a struct which marshals to a valid elasticsearch mapping configuration
 type MappingConfig struct {
 	Properties map[string]MappingFieldConfig `json:"properties,omitempty"`
 }
 
+// AddField adds a new field to the mapping
 func (m *MappingConfig) AddField(name string, cfg MappingFieldConfig) {
 	if m.Properties == nil {
 		m.Properties = make(map[string]MappingFieldConfig)
@@ -19,11 +21,13 @@ func (m *MappingConfig) AddField(name string, cfg MappingFieldConfig) {
 	m.Properties[name] = cfg
 }
 
+// MappingFieldConfig is a struct which represents the elasticsearch mapping configuration of one field. It is used in the MappingConfig.
 type MappingFieldConfig struct {
 	Type     string `json:"type"`
 	Analyzer string `json:"analyzer,omitempty"`
 }
 
+// MappingFromStruct returns the MappingConfig for a passed in struct (pointer). The mapping is configurable via json tags, which can change the name of the field, and elasticorm tags. The elasticorm tags can include
 func MappingFromStruct(i interface{}) (MappingConfig, error) {
 	mapping := MappingConfig{}
 	var err error
@@ -48,17 +52,29 @@ func mappingForField(tag string) (MappingFieldConfig, error) {
 	}
 
 	if tag != `` {
-		opts := strings.Split(tag, `=`)
-		switch opts[0] {
-		case `type`:
-			propMapping.Type = opts[1]
-		case `analyzer`:
-			propMapping.Analyzer = opts[1]
-		default:
-			err = errors.Wrap(InvalidOptionErr, fmt.Sprintf("parsing option %s failed", tag))
+		options := optionsFromTag(tag)
+		for name, value := range options {
+			switch name {
+			case `type`:
+				propMapping.Type = value
+			case `analyzer`:
+				propMapping.Analyzer = value
+			default:
+				err = errors.Wrap(ErrInvalidOption, fmt.Sprintf("parsing option %s=%s failed", name, value))
+			}
 		}
 	}
 	return propMapping, err
+}
+
+func optionsFromTag(tag string) map[string]string {
+	options := make(map[string]string, 2)
+	definitions := strings.Split(tag, `,`)
+	for _, definition := range definitions {
+		kv := strings.Split(definition, `=`)
+		options[kv[0]] = kv[1]
+	}
+	return options
 }
 
 func nameForField(field reflect.StructField) string {
