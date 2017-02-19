@@ -1,6 +1,6 @@
 package elasticorm
 
-// IndexDefinition is a struct wich marshales to a valid JSON configuration for creating a new elasticsearch index
+// IndexDefinition is a struct which marshals to a valid JSON configuration for creating a new elasticsearch index
 type IndexDefinition struct {
 	Settings *indexSettings         `json:"settings,omitempty"`
 	Mappings map[string]interface{} `json:"mappings,omitempty"`
