@@ -35,7 +35,9 @@ func MappingFromStruct(i interface{}) (MappingConfig, error) {
 	v := reflect.ValueOf(i).Elem()
 	for n := 0; n < v.NumField(); n++ {
 		fieldMapping, propErr := mappingForField(v.Type().Field(n).Tag.Get(`elasticorm`))
-		if propErr != nil {
+		if propErr == errIdField {
+			continue
+		} else if propErr != nil {
 			err = propErr
 		}
 		name := nameForField(v.Type().Field(n))
@@ -59,6 +61,8 @@ func mappingForField(tag string) (MappingFieldConfig, error) {
 				propMapping.Type = value
 			case `analyzer`:
 				propMapping.Analyzer = value
+			case `id`:
+				return MappingFieldConfig{}, errIdField
 			default:
 				err = errors.Wrap(ErrInvalidOption, fmt.Sprintf("parsing option %s=%s failed", name, value))
 			}
@@ -72,7 +76,11 @@ func optionsFromTag(tag string) map[string]string {
 	definitions := strings.Split(tag, `,`)
 	for _, definition := range definitions {
 		kv := strings.Split(definition, `=`)
-		options[kv[0]] = kv[1]
+		if len(kv) > 1 {
+			options[kv[0]] = kv[1]
+		} else {
+			options[kv[0]] = ``
+		}
 	}
 	return options
 }

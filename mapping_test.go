@@ -104,6 +104,18 @@ var mappingTestCases []mappingTestCase = []mappingTestCase{
 		ExpectedJSON:  `{"properties":{"date":{"type":"date","analyzer":"simple"},"first_name":{"type":"text"}}}`,
 		ExpectedError: nil,
 	},
+	mappingTestCase{
+		Title: `For a struct with an elastic ID - which should not be mapped`,
+		Input: func() interface{} {
+			type User struct {
+				ID        string `elasticorm:"id"`
+				FirstName string `json:"first_name"`
+			}
+			return &User{}
+		}(),
+		ExpectedJSON:  `{"properties":{"first_name":{"type":"text"}}}`,
+		ExpectedError: nil,
+	},
 	/*
 		TODO
 		{
