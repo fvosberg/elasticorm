@@ -23,10 +23,7 @@ func TestEnsureIndexExists(t *testing.T) {
 		elasticSearchURL,
 	)
 	ok(t, err)
-	_, err = client.DeleteIndex(`_all`).Do(context.Background())
-	ok(t, err)
-	_, err = client.Refresh().Do(context.Background())
-	ok(t, err)
+	deleteAllIndices(t, client)
 
 	ds, err := elasticorm.NewDatastore(
 		client,
@@ -36,11 +33,7 @@ func TestEnsureIndexExists(t *testing.T) {
 	err = ds.EnsureIndexExists()
 	ok(t, err)
 
-	_, err = client.Refresh().Do(context.Background())
-	ok(t, err)
-	exists, err := client.IndexExists(`users`).Do(context.Background())
-	ok(t, err)
-	assert(t, exists, `The index users should exist`)
+	indexExists(t, client, `users`)
 	actMapping, err := client.GetMapping().Do(context.Background())
 	ok(t, err)
 	actMappingJSON, err := json.Marshal(actMapping)
@@ -50,4 +43,19 @@ func TestEnsureIndexExists(t *testing.T) {
 		`{"users":{"mappings":{"user":{"properties":{"date":{"type":"date"},"name":{"type":"text"}}}}}}`,
 		string(actMappingJSON),
 	)
+}
+
+func deleteAllIndices(t *testing.T, c *elastic.Client) {
+	_, err := c.DeleteIndex(`_all`).Do(context.Background())
+	ok(t, err)
+	_, err = c.Refresh().Do(context.Background())
+	ok(t, err)
+}
+
+func indexExists(t *testing.T, c *elastic.Client, indexName string) {
+	_, err := c.Refresh().Do(context.Background())
+	ok(t, err)
+	exists, err := c.IndexExists(indexName).Do(context.Background())
+	ok(t, err)
+	assert(t, exists, `The index `+indexName+` should exist`)
 }
