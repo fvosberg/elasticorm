@@ -100,17 +100,46 @@ func TestDatastoreFindOneBy(t *testing.T) {
 		FirstName string `json:"first_name"`
 		Email     string `json:"email" elasticorm:"type=keyword"`
 	}
-	elasticClient, ds := initDatastore(t, &User{})
-	u := &User{FirstName: `The first name`, Email: `foo@bar.com`}
-	err := ds.Create(u)
-	ok(t, err)
-	elasticClient.Refresh().Do(context.Background())
+	tests := []struct {
+		title       string
+		user        User
+		searchField string
+		searchValue string
+		shouldFind  bool
+	}{
+		{
+			title:       `Find a user by email`,
+			user:        User{FirstName: `The first name`, Email: `foo@bar.com`},
+			searchField: `Email`,
+			searchValue: `foo@bar.com`,
+			shouldFind:  true,
+		},
+		{
+			title:       `Don't find a user by wrong email`,
+			user:        User{FirstName: `The first name`, Email: `foo@bar.com`},
+			searchField: `Email`,
+			searchValue: `bar@foo.com`,
+			shouldFind:  false,
+		},
+	}
 
-	found := User{}
-	err = ds.FindOneBy(`Email`, `foo@bar.com`, &found)
+	for _, tt := range tests {
+		elasticClient, ds := initDatastore(t, &User{})
+		err := ds.Create(&tt.user)
+		ok(t, err)
+		elasticClient.Refresh().Do(context.Background())
 
-	ok(t, err)
-	equals(t, *u, found)
+		found := User{}
+		err = ds.FindOneBy(tt.searchField, tt.searchValue, &found)
+
+		if tt.shouldFind {
+			ok(t, err)
+			equals(t, tt.user, found)
+		} else {
+			equals(t, elasticorm.ErrNotFound, err)
+			equals(t, User{}, found)
+		}
+	}
 }
 
 func initDatastore(t *testing.T, i interface{}) (*elastic.Client, *elasticorm.Datastore) {
