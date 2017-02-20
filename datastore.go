@@ -15,6 +15,7 @@ import (
 func NewDatastore(esc *elastic.Client, options ...DatastoreOptFunc) (*Datastore, error) {
 	ds := &Datastore{
 		elasticClient: esc,
+		Ctx:           context.Background(),
 	}
 	var err error
 	for _, opt := range options {
@@ -31,6 +32,7 @@ type DatastoreOptFunc func(*Datastore) error
 // It leverages the great elastic package from olivere
 type Datastore struct {
 	elasticClient   *elastic.Client
+	Ctx             context.Context
 	indexName       string
 	goType          reflect.Type
 	idFieldName     string          // the name of the structs field to store the ID
@@ -46,7 +48,7 @@ func (ds *Datastore) EnsureIndexExists() error {
 	}
 	exists, err := ds.elasticClient.
 		IndexExists(ds.indexName).
-		Do(context.Background())
+		Do(ds.Ctx)
 
 	if exists || err != nil {
 		return err
@@ -56,7 +58,7 @@ func (ds *Datastore) EnsureIndexExists() error {
 	if err != nil {
 		return err
 	}
-	ds.elasticClient.Refresh().Do(context.Background())
+	ds.elasticClient.Refresh().Do(ds.Ctx)
 	return nil
 }
 
@@ -68,7 +70,7 @@ func (ds *Datastore) createIndex() error {
 	ack, err := ds.elasticClient.
 		CreateIndex(ds.indexName).
 		BodyString(string(JSON)).
-		Do(context.Background())
+		Do(ds.Ctx)
 	if err != nil || !ack.Acknowledged {
 		return errors.Wrap(
 			err, fmt.Sprintf("creating elasticsearch index %s failed - %s", ds.indexName, string(JSON)),
@@ -133,7 +135,7 @@ func (ds *Datastore) Create(o interface{}) error {
 		Index(ds.indexName).
 		Type(ds.typeName).
 		BodyJson(o).
-		Do(context.Background())
+		Do(ds.Ctx)
 
 	if err != nil {
 		return err
@@ -168,7 +170,7 @@ func (ds *Datastore) Find(ID string, result interface{}) error {
 		Index(ds.indexName).
 		Type(ds.typeName).
 		Id(ID).
-		Do(context.Background())
+		Do(ds.Ctx)
 
 	if !res.Found || elastic.IsNotFound(err) {
 		return ErrNotFound
@@ -197,7 +199,7 @@ func (ds *Datastore) Update(o interface{}) error {
 		Type(ds.typeName).
 		Id(ID).
 		Doc(o).
-		Do(context.Background())
+		Do(ds.Ctx)
 
 	return err
 }
@@ -211,7 +213,7 @@ func (ds *Datastore) FindOneBy(fieldName string, value interface{}, result inter
 		Index(ds.indexName).
 		Query(elastic.NewBoolQuery().Filter(elastic.NewTermQuery(elasticFieldName, value))).
 		From(0).Size(1).
-		Do(context.Background())
+		Do(ds.Ctx)
 	if err != nil {
 		return err
 	}
