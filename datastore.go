@@ -32,8 +32,10 @@ type DatastoreOptFunc func(*Datastore) error
 type Datastore struct {
 	elasticClient   *elastic.Client
 	indexName       string
-	typeName        string
-	indexDefinition IndexDefinition
+	goType          reflect.Type
+	idFieldName     string          // the name of the structs field to store the ID
+	typeName        string          // in elasticsearch
+	indexDefinition IndexDefinition // in elasticsearch
 }
 
 // EnsureIndexExists checks wether the needed index for this datastore exists. It it doesn't it gets created
@@ -79,6 +81,7 @@ func (ds *Datastore) createIndex() error {
 // It is used to generate a default mapping, type name and index name by analysing a provided struct
 func ForStruct(i interface{}) DatastoreOptFunc {
 	return func(ds *Datastore) error {
+		ds.goType = reflect.TypeOf(i)
 		typeName, err := typeNameFromStruct(i)
 		if err != nil {
 			return err
@@ -92,6 +95,8 @@ func ForStruct(i interface{}) DatastoreOptFunc {
 			return err
 		}
 		ds.indexDefinition = indexDefinition
+		// TODO configure ID
+		ds.idFieldName = `ID`
 		return nil
 	}
 }
@@ -108,9 +113,91 @@ func typeNameFromStruct(i interface{}) (string, error) {
 }
 
 func getType(myvar interface{}) string {
-	if t := reflect.TypeOf(myvar); t.Kind() == reflect.Ptr {
+	return nameOfType(reflect.TypeOf(myvar))
+}
+
+func nameOfType(t reflect.Type) string {
+	if t.Kind() == reflect.Ptr {
 		return "*" + t.Elem().Name()
 	} else {
 		return t.Name()
 	}
+}
+
+func (ds *Datastore) Create(o interface{}) error {
+	err := ds.isSaveableType(o)
+	if err != nil {
+		return err
+	}
+	put, err := ds.elasticClient.Index().
+		Index(ds.indexName).
+		Type(ds.typeName).
+		BodyJson(o).
+		Do(context.Background())
+
+	if err != nil {
+		return err
+	}
+	if !put.Created {
+		return ErrCreationFailed
+	}
+	return ds.setID(o, put.Id)
+}
+
+func (ds *Datastore) isSaveableType(i interface{}) error {
+	rt := reflect.TypeOf(i)
+	if nameOfType(rt) != nameOfType(ds.goType) {
+		return errors.Wrapf(
+			ErrInvalidType,
+			`create failed for %s, expected %s`, nameOfType(rt), nameOfType(ds.goType),
+		)
+	}
+	rv := reflect.ValueOf(i)
+	if rv.Kind() != reflect.Ptr || rv.IsNil() {
+		return errors.Wrap(ErrInvalidType, `no pointer given`)
+	}
+	return nil
+}
+
+func (ds *Datastore) Find(ID string, result interface{}) error {
+	err := ds.isSaveableType(result)
+	if err != nil {
+		return err
+	}
+	res, err := ds.elasticClient.Get().
+		Index(ds.indexName).
+		Type(ds.typeName).
+		Id(ID).
+		Do(context.Background())
+
+	if !res.Found || elastic.IsNotFound(err) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+
+	return ds.decodeElasticResponse(res.Source, res.Id, result)
+}
+
+func (ds *Datastore) setID(o interface{}, ID string) error {
+	eo := reflect.ValueOf(o).Elem()
+	if eo.Kind() != reflect.Struct {
+		return errors.Wrap(ErrInvalidType, `setID failed`)
+	}
+	idField := eo.FieldByName(ds.idFieldName)
+	if !idField.IsValid() || !idField.CanSet() || idField.Kind() != reflect.String {
+		return ErrInvalidIDField
+	}
+	idField.SetString(ID)
+	return nil
+}
+
+func (ds *Datastore) decodeElasticResponse(source *json.RawMessage, ID string, o interface{}) error {
+	err := json.Unmarshal(*source, o)
+	if err != nil {
+		return err
+	}
+	ds.setID(o, ID)
+	return nil
 }
