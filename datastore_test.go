@@ -74,6 +74,42 @@ func TestCreateAUser(t *testing.T) {
 	equals(t, *user, *gotUser)
 }
 
+func TestUpdateAUser(t *testing.T) {
+	type User struct {
+		ID        string `json:"id" elasticorm:"id"`
+		FirstName string `json:"first_name"`
+		LastName  string `json:"last_name"`
+	}
+	client := elasticClient(t)
+	deleteAllIndices(t, client)
+	ds, err := elasticorm.NewDatastore(
+		client,
+		elasticorm.ForStruct(&User{}),
+	)
+	ok(t, err)
+	err = ds.EnsureIndexExists()
+	ok(t, err)
+
+	u := &User{
+		FirstName: `Pre Firstname`,
+		LastName:  `Lastname`,
+	}
+	err = ds.Create(u)
+	ok(t, err)
+	u.FirstName = `Post Firstname`
+	err = ds.Update(u)
+	ok(t, err)
+
+	if u.ID == `` {
+		t.Error(`The ID of the user should not be empty`)
+		t.FailNow()
+	}
+	gotUser := User{}
+	err = ds.Find(u.ID, &gotUser)
+	ok(t, err)
+	equals(t, `Post Firstname`, gotUser.FirstName)
+}
+
 func elasticClient(t *testing.T) *elastic.Client {
 	client, err := elastic.NewClient(
 		elastic.SetURL(elasticSearchURL),

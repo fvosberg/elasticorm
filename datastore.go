@@ -180,6 +180,28 @@ func (ds *Datastore) Find(ID string, result interface{}) error {
 	return ds.decodeElasticResponse(res.Source, res.Id, result)
 }
 
+func (ds *Datastore) Update(o interface{}) error {
+	err := ds.isSaveableType(o)
+	if err != nil {
+		return err
+	}
+	ID, err := ds.getID(o)
+	if err != nil {
+		return err
+	}
+	if ID == `` {
+		return errors.New(`can't save struct with empty ID`)
+	}
+	_, err = ds.elasticClient.Update().
+		Index(ds.indexName).
+		Type(ds.typeName).
+		Id(ID).
+		Doc(o).
+		Do(context.Background())
+
+	return err
+}
+
 func (ds *Datastore) setID(o interface{}, ID string) error {
 	eo := reflect.ValueOf(o).Elem()
 	if eo.Kind() != reflect.Struct {
@@ -191,6 +213,18 @@ func (ds *Datastore) setID(o interface{}, ID string) error {
 	}
 	idField.SetString(ID)
 	return nil
+}
+
+func (ds *Datastore) getID(o interface{}) (string, error) {
+	eo := reflect.ValueOf(o).Elem()
+	if eo.Kind() != reflect.Struct {
+		return ``, errors.Wrap(ErrInvalidType, `getID failed`)
+	}
+	idField := eo.FieldByName(ds.idFieldName)
+	if !idField.IsValid() || idField.Kind() != reflect.String {
+		return ``, ErrInvalidIDField
+	}
+	return idField.String(), nil
 }
 
 func (ds *Datastore) decodeElasticResponse(source *json.RawMessage, ID string, o interface{}) error {
