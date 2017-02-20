@@ -3,6 +3,7 @@ package elasticorm_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/fvosberg/elasticorm"
@@ -101,11 +102,12 @@ func TestDatastoreFindOneBy(t *testing.T) {
 		Email     string `json:"email" elasticorm:"type=keyword"`
 	}
 	tests := []struct {
-		title       string
-		user        User
-		searchField string
-		searchValue string
-		shouldFind  bool
+		title         string
+		user          User
+		searchField   string
+		searchValue   string
+		shouldFind    bool
+		expectedError error
 	}{
 		{
 			title:       `Find a user by email`,
@@ -115,11 +117,20 @@ func TestDatastoreFindOneBy(t *testing.T) {
 			shouldFind:  true,
 		},
 		{
-			title:       `Don't find a user by wrong email`,
-			user:        User{FirstName: `The first name`, Email: `foo@bar.com`},
-			searchField: `Email`,
-			searchValue: `bar@foo.com`,
-			shouldFind:  false,
+			title:         `Don't find a user by wrong email`,
+			user:          User{FirstName: `The first name`, Email: `foo@bar.com`},
+			searchField:   `Email`,
+			searchValue:   `bar@foo.com`,
+			shouldFind:    false,
+			expectedError: elasticorm.ErrNotFound,
+		},
+		{
+			title:         `Search for a field which doesn't exist`,
+			user:          User{FirstName: `The first name`, Email: `foo@bar.com`},
+			searchField:   `email`,
+			searchValue:   `foo@bar.com`,
+			shouldFind:    false,
+			expectedError: errors.New(`Mapping configuration has no mapping for struct field`),
 		},
 	}
 
@@ -132,11 +143,14 @@ func TestDatastoreFindOneBy(t *testing.T) {
 		found := User{}
 		err = ds.FindOneBy(tt.searchField, tt.searchValue, &found)
 
-		if tt.shouldFind {
+		if tt.expectedError != nil {
+			equals(t, tt.expectedError.Error(), err.Error())
+		} else {
 			ok(t, err)
+		}
+		if tt.shouldFind {
 			equals(t, tt.user, found)
 		} else {
-			equals(t, elasticorm.ErrNotFound, err)
 			equals(t, User{}, found)
 		}
 	}
