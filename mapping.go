@@ -21,10 +21,20 @@ func (m *MappingConfig) AddField(name string, cfg MappingFieldConfig) {
 	m.Properties[name] = cfg
 }
 
+func (m MappingConfig) elasticFieldName(structFieldName string) (string, error) {
+	for propertyName, propertyMapping := range m.Properties {
+		if propertyMapping.structFieldName == structFieldName {
+			return propertyName, nil
+		}
+	}
+	return ``, errors.New(`Mapping configuration has no mapping for struct field`)
+}
+
 // MappingFieldConfig is a struct which represents the elasticsearch mapping configuration of one field. It is used in the MappingConfig.
 type MappingFieldConfig struct {
-	Type     string `json:"type"`
-	Analyzer string `json:"analyzer,omitempty"`
+	Type            string `json:"type"`
+	Analyzer        string `json:"analyzer,omitempty"`
+	structFieldName string `json:"-"`
 }
 
 // MappingFromStruct returns the MappingConfig for a passed in struct (pointer). The mapping is configurable via json tags, which can change the name of the field, and elasticorm tags. The elasticorm tags can include
@@ -34,7 +44,7 @@ func MappingFromStruct(i interface{}) (MappingConfig, error) {
 
 	v := reflect.ValueOf(i).Elem()
 	for n := 0; n < v.NumField(); n++ {
-		fieldMapping, propErr := mappingForField(v.Type().Field(n).Tag.Get(`elasticorm`))
+		fieldMapping, propErr := mappingForField(v.Type().Field(n))
 		if propErr == errIdField {
 			continue
 		} else if propErr != nil {
@@ -47,10 +57,12 @@ func MappingFromStruct(i interface{}) (MappingConfig, error) {
 	return mapping, err
 }
 
-func mappingForField(tag string) (MappingFieldConfig, error) {
+func mappingForField(field reflect.StructField) (MappingFieldConfig, error) {
 	var err error
+	tag := field.Tag.Get(`elasticorm`)
 	propMapping := MappingFieldConfig{
-		Type: `text`,
+		Type:            `text`,
+		structFieldName: field.Name,
 	}
 
 	if tag != `` {

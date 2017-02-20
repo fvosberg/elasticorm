@@ -202,6 +202,25 @@ func (ds *Datastore) Update(o interface{}) error {
 	return err
 }
 
+func (ds *Datastore) FindOneBy(fieldName string, value interface{}, result interface{}) error {
+	elasticFieldName, err := ds.indexDefinition.elasticFieldName(ds.typeName, fieldName)
+	if err != nil {
+		return err
+	}
+	res, err := ds.elasticClient.Search().
+		Index(ds.indexName).
+		Query(elastic.NewBoolQuery().Filter(elastic.NewTermQuery(elasticFieldName, value))).
+		From(0).Size(1).
+		Do(context.Background())
+	if err != nil {
+		return err
+	}
+	if res.TotalHits() < 1 {
+		return ErrNotFound
+	}
+	return ds.decodeElasticResponse(res.Hits.Hits[0].Source, res.Hits.Hits[0].Id, result)
+}
+
 func (ds *Datastore) setID(o interface{}, ID string) error {
 	eo := reflect.ValueOf(o).Elem()
 	if eo.Kind() != reflect.Struct {

@@ -10,7 +10,7 @@ import (
 	"gopkg.in/olivere/elastic.v5"
 )
 
-func TestEnsureIndexExists(t *testing.T) {
+func TestDatastoreEnsureIndexExists(t *testing.T) {
 	type User struct {
 		Name        string `json:"name"`
 		DateOfBirth string `json:"date" elasticorm:"type=date"`
@@ -38,35 +38,27 @@ func TestEnsureIndexExists(t *testing.T) {
 	)
 }
 
-func TestCreateAUser(t *testing.T) {
+func TestDatastoreCreateAUser(t *testing.T) {
 	type User struct {
 		ID        string `json:"id" elasticorm:"id"`
 		FirstName string `json:"first_name"`
 		LastName  string `json:"last_name"`
 	}
-	client := elasticClient(t)
-	deleteAllIndices(t, client)
-	ds, err := elasticorm.NewDatastore(
-		client,
-		elasticorm.ForStruct(&User{}),
-	)
-	ok(t, err)
-	err = ds.EnsureIndexExists()
-	ok(t, err)
+	elasticClient, ds := initDatastore(t, &User{})
 
 	user := &User{
 		// TODO test error on setted ID
 		FirstName: `Foobar`,
 		LastName:  `Barfoo`,
 	}
-	err = ds.Create(user)
+	err := ds.Create(user)
 	ok(t, err)
 
 	if user.ID == `` {
 		t.Error(`The ID of the user should be set after persisting`)
 		t.FailNow()
 	}
-	_, err = client.Refresh().Do(context.Background())
+	_, err = elasticClient.Refresh().Do(context.Background())
 	ok(t, err)
 	gotUser := &User{}
 	err = ds.Find(user.ID, gotUser)
@@ -74,27 +66,19 @@ func TestCreateAUser(t *testing.T) {
 	equals(t, *user, *gotUser)
 }
 
-func TestUpdateAUser(t *testing.T) {
+func TestDatastoreUpdateAUser(t *testing.T) {
 	type User struct {
 		ID        string `json:"id" elasticorm:"id"`
 		FirstName string `json:"first_name"`
 		LastName  string `json:"last_name"`
 	}
-	client := elasticClient(t)
-	deleteAllIndices(t, client)
-	ds, err := elasticorm.NewDatastore(
-		client,
-		elasticorm.ForStruct(&User{}),
-	)
-	ok(t, err)
-	err = ds.EnsureIndexExists()
-	ok(t, err)
+	_, ds := initDatastore(t, &User{})
 
 	u := &User{
 		FirstName: `Pre Firstname`,
 		LastName:  `Lastname`,
 	}
-	err = ds.Create(u)
+	err := ds.Create(u)
 	ok(t, err)
 	u.FirstName = `Post Firstname`
 	err = ds.Update(u)
@@ -108,6 +92,38 @@ func TestUpdateAUser(t *testing.T) {
 	err = ds.Find(u.ID, &gotUser)
 	ok(t, err)
 	equals(t, `Post Firstname`, gotUser.FirstName)
+}
+
+func TestDatastoreFindOneBy(t *testing.T) {
+	type User struct {
+		ID        string `json:"id" elasticorm:"id"`
+		FirstName string `json:"first_name"`
+		Email     string `json:"email" elasticorm:"type=keyword"`
+	}
+	elasticClient, ds := initDatastore(t, &User{})
+	u := &User{FirstName: `The first name`, Email: `foo@bar.com`}
+	err := ds.Create(u)
+	ok(t, err)
+	elasticClient.Refresh().Do(context.Background())
+
+	found := User{}
+	err = ds.FindOneBy(`Email`, `foo@bar.com`, &found)
+
+	ok(t, err)
+	equals(t, *u, found)
+}
+
+func initDatastore(t *testing.T, i interface{}) (*elastic.Client, *elasticorm.Datastore) {
+	client := elasticClient(t)
+	deleteAllIndices(t, client)
+	ds, err := elasticorm.NewDatastore(
+		client,
+		elasticorm.ForStruct(i),
+	)
+	ok(t, err)
+	err = ds.EnsureIndexExists()
+	ok(t, err)
+	return client, ds
 }
 
 func elasticClient(t *testing.T) *elastic.Client {
