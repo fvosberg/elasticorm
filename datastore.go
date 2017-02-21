@@ -58,7 +58,7 @@ func (ds *Datastore) EnsureIndexExists() error {
 	if err != nil {
 		return err
 	}
-	ds.elasticClient.Refresh().Do(ds.Ctx)
+	ds.Refresh()
 	return nil
 }
 
@@ -77,6 +77,45 @@ func (ds *Datastore) createIndex() error {
 		)
 	}
 	return nil
+}
+
+func (ds *Datastore) EnsureIndexDoesntExist() error {
+	if ds.indexName == `` {
+		return errors.New(`EnsureIndexDoesntExists failed, because no index name is defined`)
+	}
+	exists, err := ds.elasticClient.
+		IndexExists(ds.indexName).
+		Do(ds.Ctx)
+
+	if !exists || err != nil {
+		return err
+	}
+	res, err := ds.elasticClient.
+		DeleteIndex(ds.indexName).
+		Do(context.Background())
+	if err != nil || !res.Acknowledged {
+		return errors.Wrap(
+			err, fmt.Sprintf("deleting elasticsearch index %s failed", ds.indexName),
+		)
+	}
+	return nil
+}
+
+func (ds *Datastore) CleanUp() error {
+	err := ds.EnsureIndexDoesntExist()
+	if err != nil {
+		return err
+	}
+	err = ds.EnsureIndexExists()
+	if err != nil {
+		return err
+	}
+	return ds.Refresh()
+}
+
+func (ds *Datastore) Refresh() error {
+	_, err := ds.elasticClient.Refresh().Do(ds.Ctx)
+	return err
 }
 
 // ForStruct generates a DatastoreOptFunc
@@ -172,7 +211,7 @@ func (ds *Datastore) Find(ID string, result interface{}) error {
 		Id(ID).
 		Do(ds.Ctx)
 
-	if !res.Found || elastic.IsNotFound(err) {
+	if elastic.IsNotFound(err) || (res != nil && !res.Found) {
 		return ErrNotFound
 	}
 	if err != nil {
