@@ -175,6 +175,18 @@ var mappingTestCases []mappingTestCase = []mappingTestCase{
 		ExpectedJSON:  `{"properties":{"last_name":{"type":"text"}}}`,
 		ExpectedError: nil,
 	},
+	mappingTestCase{
+		Title: `For a struct with a not configured *time.Time`,
+		Input: func() interface{} {
+			type User struct {
+				FirstName   string     `json:"first_name"`
+				DateOfBirth *time.Time `json:"date" elasticorm:"analyzer=simple"`
+			}
+			return &User{}
+		}(),
+		ExpectedJSON:  `{"properties":{"date":{"type":"date","analyzer":"simple"},"first_name":{"type":"text"}}}`,
+		ExpectedError: nil,
+	},
 	/*
 		TODO
 		{

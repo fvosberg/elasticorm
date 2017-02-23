@@ -93,6 +93,9 @@ func typeForField(f reflect.StructField) string {
 	if val, ok := optionValueForField(f, `type`); ok {
 		return val
 	}
+	if t.PkgPath() == `time` && t.Name() == `Time` {
+		return `date`
+	}
 	switch t.Kind() {
 	case reflect.Struct:
 		return `object`
