@@ -44,13 +44,15 @@ func MappingFromStruct(i interface{}) (MappingConfig, error) {
 	var err error
 	v := reflect.ValueOf(i).Elem()
 	for n := 0; n < v.NumField(); n++ {
-		fieldMapping, propErr := mappingForField(v.Type().Field(n))
-		if propErr == errIdField {
+		field := v.Type().Field(n)
+		if !shouldMapField(field) {
 			continue
-		} else if propErr != nil {
+		}
+		fieldMapping, propErr := mappingForField(field)
+		if propErr != nil {
 			err = propErr
 		}
-		name := nameForField(v.Type().Field(n))
+		name := nameForField(field)
 		mapping.AddField(name, fieldMapping)
 	}
 	return mapping, err
@@ -75,7 +77,6 @@ func mappingForField(field reflect.StructField) (MappingFieldConfig, error) {
 			case `analyzer`:
 				propMapping.Analyzer = value
 			case `id`:
-				return MappingFieldConfig{}, errIdField
 			default:
 				err = errors.Wrap(ErrInvalidOption, fmt.Sprintf("parsing option %s=%s failed", name, value))
 			}
@@ -93,6 +94,21 @@ func typeForField(field reflect.StructField) string {
 	}
 }
 
+func optionValueForField(f reflect.StructField, name string) (string, bool) {
+	o := optionsForField(f)
+	v, ok := o[name]
+	return v, ok
+}
+
+func optionsForField(f reflect.StructField) map[string]string {
+	o := make(map[string]string, 2)
+	tag := f.Tag.Get(`elasticorm`)
+	if tag == `` {
+		return o
+	}
+	return optionsFromTag(tag)
+}
+
 func propertiesForField(t reflect.Type) (map[string]MappingFieldConfig, error) {
 	if t.Kind() != reflect.Struct {
 		return nil, nil
@@ -101,9 +117,16 @@ func propertiesForField(t reflect.Type) (map[string]MappingFieldConfig, error) {
 	var err error
 	for n := 0; n < t.NumField(); n++ {
 		field := t.Field(n)
-		properties[nameForField(field)], err = mappingForField(field)
+		if shouldMapField(field) {
+			properties[nameForField(field)], err = mappingForField(field)
+		}
 	}
 	return properties, err
+}
+
+func shouldMapField(f reflect.StructField) bool {
+	_, isId := optionValueForField(f, `id`)
+	return !(isId || f.Tag.Get(`json`) == `-`)
 }
 
 func optionsFromTag(tag string) map[string]string {

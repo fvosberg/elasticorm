@@ -147,6 +147,18 @@ var mappingTestCases []mappingTestCase = []mappingTestCase{
 		ExpectedJSON:  `{"properties":{"gender":{"type":"keyword"},"name":{"type":"object","properties":{"last_name":{"type":"text"},"title":{"type":"keyword"}}}}}`,
 		ExpectedError: nil,
 	},
+	mappingTestCase{
+		Title: `For a struct with an field which is omitted in JSON marshalling`,
+		Input: func() interface{} {
+			type User struct {
+				FirstName string `json:"-"`
+				LastName  string `json:"last_name"`
+			}
+			return &User{}
+		}(),
+		ExpectedJSON:  `{"properties":{"last_name":{"type":"text"}}}`,
+		ExpectedError: nil,
+	},
 	/*
 		TODO
 		{
