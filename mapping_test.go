@@ -187,6 +187,21 @@ var mappingTestCases []mappingTestCase = []mappingTestCase{
 		ExpectedJSON:  `{"properties":{"date":{"type":"date","analyzer":"simple"},"first_name":{"type":"text"}}}`,
 		ExpectedError: nil,
 	},
+	mappingTestCase{
+		Title: `For a struct with a slice of elements`,
+		Input: func() interface{} {
+			type Coffee struct {
+				Brand string `json:"brand" elasticorm:"type=keyword"`
+			}
+			type User struct {
+				FirstName string   `json:"first_name"`
+				Coffees   []Coffee `json:"coffees"`
+			}
+			return &User{}
+		}(),
+		ExpectedJSON:  `{"properties":{"coffees":{"type":"nested","properties":{"brand":{"type":"keyword"}}},"first_name":{"type":"text"}}}`,
+		ExpectedError: nil,
+	},
 	/*
 		TODO
 		{

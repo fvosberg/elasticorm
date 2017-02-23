@@ -97,6 +97,8 @@ func typeForField(f reflect.StructField) string {
 		return `date`
 	}
 	switch t.Kind() {
+	case reflect.Slice:
+		return `nested`
 	case reflect.Struct:
 		return `object`
 	default:
@@ -120,12 +122,12 @@ func optionsForField(f reflect.StructField) map[string]string {
 }
 
 func propertiesForField(f reflect.StructField) (map[string]MappingFieldConfig, error) {
-	if typeForField(f) != `object` {
-		return nil, nil
-	}
 	t := f.Type
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Ptr || t.Kind() == reflect.Slice {
 		t = t.Elem()
+	}
+	if typeForField(f) != `nested` && typeForField(f) != `object` {
+		return nil, nil
 	}
 	properties := make(map[string]MappingFieldConfig, t.NumField())
 	var err error
