@@ -116,6 +116,37 @@ var mappingTestCases []mappingTestCase = []mappingTestCase{
 		ExpectedJSON:  `{"properties":{"first_name":{"type":"text"}}}`,
 		ExpectedError: nil,
 	},
+	mappingTestCase{
+		Title: `For a nested struct with an anonymous`,
+		Input: func() interface{} {
+			type User struct {
+				Gender string `json:"gender" elasticorm:"type=keyword"`
+				Name   struct {
+					Title    string `json:"title" elasticorm:"type=keyword"`
+					LastName string `json:"last_name"`
+				} `json:"name"`
+			}
+			return &User{}
+		}(),
+		ExpectedJSON:  `{"properties":{"gender":{"type":"keyword"},"name":{"type":"object","properties":{"last_name":{"type":"text"},"title":{"type":"keyword"}}}}}`,
+		ExpectedError: nil,
+	},
+	mappingTestCase{
+		Title: `For a nested struct with an own definition`,
+		Input: func() interface{} {
+			type Name struct {
+				Title    string `json:"title" elasticorm:"type=keyword"`
+				LastName string `json:"last_name"`
+			}
+			type User struct {
+				Gender string `json:"gender" elasticorm:"type=keyword"`
+				Name   Name   `json:"name"`
+			}
+			return &User{}
+		}(),
+		ExpectedJSON:  `{"properties":{"gender":{"type":"keyword"},"name":{"type":"object","properties":{"last_name":{"type":"text"},"title":{"type":"keyword"}}}}}`,
+		ExpectedError: nil,
+	},
 	/*
 		TODO
 		{

@@ -32,16 +32,16 @@ func (m MappingConfig) elasticFieldName(structFieldName string) (string, error) 
 
 // MappingFieldConfig is a struct which represents the elasticsearch mapping configuration of one field. It is used in the MappingConfig.
 type MappingFieldConfig struct {
-	Type            string `json:"type"`
-	Analyzer        string `json:"analyzer,omitempty"`
-	structFieldName string `json:"-"`
+	Type            string                        `json:"type"`
+	Analyzer        string                        `json:"analyzer,omitempty"`
+	structFieldName string                        `json:"-"`
+	Properties      map[string]MappingFieldConfig `json:"properties,omitempty"`
 }
 
 // MappingFromStruct returns the MappingConfig for a passed in struct (pointer). The mapping is configurable via json tags, which can change the name of the field, and elasticorm tags. The elasticorm tags can include
 func MappingFromStruct(i interface{}) (MappingConfig, error) {
 	mapping := MappingConfig{}
 	var err error
-
 	v := reflect.ValueOf(i).Elem()
 	for n := 0; n < v.NumField(); n++ {
 		fieldMapping, propErr := mappingForField(v.Type().Field(n))
@@ -53,19 +53,20 @@ func MappingFromStruct(i interface{}) (MappingConfig, error) {
 		name := nameForField(v.Type().Field(n))
 		mapping.AddField(name, fieldMapping)
 	}
-
 	return mapping, err
 }
 
 func mappingForField(field reflect.StructField) (MappingFieldConfig, error) {
 	var err error
-	tag := field.Tag.Get(`elasticorm`)
 	propMapping := MappingFieldConfig{
-		Type:            `text`,
+		Type:            typeForField(field),
 		structFieldName: field.Name,
 	}
-
-	if tag != `` {
+	propMapping.Properties, err = propertiesForField(field.Type)
+	if err != nil {
+		return propMapping, err
+	}
+	if tag := field.Tag.Get(`elasticorm`); tag != `` {
 		options := optionsFromTag(tag)
 		for name, value := range options {
 			switch name {
@@ -81,6 +82,28 @@ func mappingForField(field reflect.StructField) (MappingFieldConfig, error) {
 		}
 	}
 	return propMapping, err
+}
+
+func typeForField(field reflect.StructField) string {
+	switch field.Type.Kind() {
+	case reflect.Struct:
+		return `object`
+	default:
+		return `text`
+	}
+}
+
+func propertiesForField(t reflect.Type) (map[string]MappingFieldConfig, error) {
+	if t.Kind() != reflect.Struct {
+		return nil, nil
+	}
+	properties := make(map[string]MappingFieldConfig, t.NumField())
+	var err error
+	for n := 0; n < t.NumField(); n++ {
+		field := t.Field(n)
+		properties[nameForField(field)], err = mappingForField(field)
+	}
+	return properties, err
 }
 
 func optionsFromTag(tag string) map[string]string {
