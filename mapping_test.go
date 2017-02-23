@@ -148,6 +148,22 @@ var mappingTestCases []mappingTestCase = []mappingTestCase{
 		ExpectedError: nil,
 	},
 	mappingTestCase{
+		Title: `For a nested struct with a pointer to the sub struct`,
+		Input: func() interface{} {
+			type Name struct {
+				Title    string `json:"title" elasticorm:"type=keyword"`
+				LastName string `json:"last_name"`
+			}
+			type User struct {
+				Gender string `json:"gender" elasticorm:"type=keyword"`
+				Name   *Name  `json:"name"`
+			}
+			return &User{}
+		}(),
+		ExpectedJSON:  `{"properties":{"gender":{"type":"keyword"},"name":{"type":"object","properties":{"last_name":{"type":"text"},"title":{"type":"keyword"}}}}}`,
+		ExpectedError: nil,
+	},
+	mappingTestCase{
 		Title: `For a struct with an field which is omitted in JSON marshalling`,
 		Input: func() interface{} {
 			type User struct {

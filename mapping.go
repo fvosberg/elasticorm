@@ -64,7 +64,7 @@ func mappingForField(field reflect.StructField) (MappingFieldConfig, error) {
 		Type:            typeForField(field),
 		structFieldName: field.Name,
 	}
-	propMapping.Properties, err = propertiesForField(field.Type)
+	propMapping.Properties, err = propertiesForField(field)
 	if err != nil {
 		return propMapping, err
 	}
@@ -85,8 +85,15 @@ func mappingForField(field reflect.StructField) (MappingFieldConfig, error) {
 	return propMapping, err
 }
 
-func typeForField(field reflect.StructField) string {
-	switch field.Type.Kind() {
+func typeForField(f reflect.StructField) string {
+	t := f.Type
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if val, ok := optionValueForField(f, `type`); ok {
+		return val
+	}
+	switch t.Kind() {
 	case reflect.Struct:
 		return `object`
 	default:
@@ -109,9 +116,13 @@ func optionsForField(f reflect.StructField) map[string]string {
 	return optionsFromTag(tag)
 }
 
-func propertiesForField(t reflect.Type) (map[string]MappingFieldConfig, error) {
-	if t.Kind() != reflect.Struct {
+func propertiesForField(f reflect.StructField) (map[string]MappingFieldConfig, error) {
+	if typeForField(f) != `object` {
 		return nil, nil
+	}
+	t := f.Type
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
 	}
 	properties := make(map[string]MappingFieldConfig, t.NumField())
 	var err error
