@@ -269,7 +269,7 @@ func (ds *Datastore) FindAll(offset int, limit int, results interface{}, opts ..
 	q := ds.elasticClient.Search().
 		Index(ds.indexName).
 		Query(elastic.NewMatchAllQuery()).
-		From(0).Size(100)
+		From(offset).Size(limit)
 
 	for _, opt := range opts {
 		err := opt(q)

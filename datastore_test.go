@@ -200,6 +200,61 @@ func TestFindByGeoBoundingBox(t *testing.T) {
 }
 
 func TestFindAll(t *testing.T) {
+	assertions := []struct {
+		Offset        int
+		Limit         int
+		Order         string
+		ExpectedNames []string
+	}{
+		{
+			Offset: 0,
+			Limit:  10,
+			Order:  `asc`,
+			ExpectedNames: []string{
+				`Unknown No. 0`,
+				`Unknown No. 1`,
+				`Unknown No. 2`,
+				`Unknown No. 3`,
+				`Unknown No. 4`,
+				`Unknown No. 5`,
+				`Unknown No. 6`,
+				`Unknown No. 7`,
+				`Unknown No. 8`,
+				`Unknown No. 9`,
+			},
+		},
+		{
+			Offset: 0,
+			Limit:  3,
+			Order:  `asc`,
+			ExpectedNames: []string{
+				`Unknown No. 0`,
+				`Unknown No. 1`,
+				`Unknown No. 2`,
+			},
+		},
+		{
+			Offset: 3,
+			Limit:  3,
+			Order:  `asc`,
+			ExpectedNames: []string{
+				`Unknown No. 3`,
+				`Unknown No. 4`,
+				`Unknown No. 5`,
+			},
+		},
+		{
+			Offset: 3,
+			Limit:  3,
+			Order:  `desc`,
+			ExpectedNames: []string{
+				`Unknown No. 6`,
+				`Unknown No. 5`,
+				`Unknown No. 4`,
+			},
+		},
+	}
+
 	type User struct {
 		ID   string `json:"id" elasticorm:"id"`
 		Name string `json:"name" elasticorm:"type=text,sortable"` // TODO error on not sorted | test with keyword
@@ -217,14 +272,15 @@ func TestFindAll(t *testing.T) {
 		ds.Refresh()
 	}
 
-	found := []User{}
-	err = ds.FindAll(0, 10, &found, ds.SetSorting(`Name`, `asc`))
-	ok(t, err)
+	for _, a := range assertions {
+		found := []User{}
+		err = ds.FindAll(a.Offset, a.Limit, &found, ds.SetSorting(`Name`, a.Order))
+		ok(t, err)
 
-	equals(t, 10, len(found))
-	fmt.Printf("%#v\n", found)
-	for i := 0; i < 10; i++ {
-		equals(t, found[i].Name, fmt.Sprintf("Unknown No. %d", i))
+		equals(t, len(found), len(a.ExpectedNames))
+		for i, name := range a.ExpectedNames {
+			equals(t, name, found[i].Name)
+		}
 	}
 }
 
