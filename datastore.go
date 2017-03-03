@@ -262,6 +262,73 @@ func (ds *Datastore) FindOneBy(fieldName string, value interface{}, result inter
 	return ds.decodeElasticResponse(res.Hits.Hits[0].Source, res.Hits.Hits[0].Id, result)
 }
 
+type BoundingBox struct {
+	Top    float64
+	Left   float64
+	Bottom float64
+	Right  float64
+}
+
+func NewBoundingBox(top, right, bottom, left float64) BoundingBox {
+	return BoundingBox{
+		Top:    top,
+		Right:  right,
+		Bottom: bottom,
+		Left:   left,
+	}
+}
+
+func (ds *Datastore) FindByGeoBoundingBox(fieldName string, box BoundingBox, results interface{}) error {
+	elasticFieldName, err := ds.indexDefinition.elasticFieldName(ds.typeName, fieldName)
+	if err != nil {
+		return err
+	}
+	query := elastic.NewGeoBoundingBoxQuery(elasticFieldName).
+		TopLeft(box.Top, box.Left).
+		BottomRight(box.Bottom, box.Right)
+
+	res, err := ds.elasticClient.Search().
+		Index(ds.indexName).
+		// TODO query type
+		Query(elastic.NewBoolQuery().Filter(query)).
+		Do(ds.Ctx)
+
+	if err != nil {
+		return err
+	}
+	if res.TotalHits() < 1 {
+		return ErrNotFound
+	}
+
+	return ds.decodeElasticResponses(res.Hits.Hits, results)
+}
+
+func (ds *Datastore) decodeElasticResponses(hits []*elastic.SearchHit, results interface{}) error {
+	resultsv := reflect.ValueOf(results)
+	if resultsv.Kind() != reflect.Ptr || resultsv.Elem().Kind() != reflect.Slice {
+		panic("result argument must be a slice address")
+	}
+
+	slicev := resultsv.Elem()
+	slicev = slicev.Slice(0, slicev.Cap())
+	elemt := slicev.Type().Elem()
+
+	for _, hit := range hits {
+		elemp := reflect.New(elemt)
+
+		err := ds.decodeElasticResponse(hit.Source, hit.Id, elemp.Interface())
+		if err != nil {
+			return err
+		}
+
+		slicev = reflect.Append(slicev, elemp.Elem())
+		slicev = slicev.Slice(0, slicev.Cap())
+	}
+
+	resultsv.Elem().Set(slicev.Slice(0, len(hits)))
+	return nil
+}
+
 func (ds *Datastore) setID(o interface{}, ID string) error {
 	eo := reflect.ValueOf(o).Elem()
 	if eo.Kind() != reflect.Struct {

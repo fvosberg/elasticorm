@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
+	"os"
 	"testing"
 
 	"github.com/fvosberg/elasticorm"
@@ -156,6 +158,46 @@ func TestDatastoreFindOneBy(t *testing.T) {
 	}
 }
 
+func TestFindByGeoBoundingBox(t *testing.T) {
+	// TODO support deeper nested location structs like User.Home.Location
+	// TODO check search on non geopoint
+	type Location struct {
+		Lat float64 `json:"lat"`
+		Lon float64 `json:"lon"`
+	}
+	type User struct {
+		ID       string    `json:"id" elasticorm:"id"`
+		Name     string    `json:"name"`
+		Location *Location `json:"loc" elasticorm:"type=geo_point"`
+	}
+
+	_, ds := initDatastore(t, &User{})
+	err := ds.Create(&User{Name: "Juister", Location: &Location{Lat: 53.679598, Lon: 6.994391}})
+	ok(t, err)
+	err = ds.Create(&User{Name: "Swimmer", Location: &Location{Lat: 53.693986, Lon: 6.992063}})
+	ok(t, err)
+	ds.Refresh()
+	bottomLeft := Location{
+		Lat: 53.672103,
+		Lon: 6.962326,
+	}
+	topRight := Location{
+		Lat: 53.685006,
+		Lon: 7.017360,
+	}
+
+	found := []User{}
+	err = ds.FindByGeoBoundingBox(
+		`Location`,
+		elasticorm.NewBoundingBox(topRight.Lat, topRight.Lon, bottomLeft.Lat, bottomLeft.Lon),
+		&found,
+	)
+	ok(t, err)
+
+	equals(t, 1, len(found))
+	equals(t, "Juister", found[0].Name)
+}
+
 func initDatastore(t *testing.T, i interface{}) (*elastic.Client, *elasticorm.Datastore) {
 	client := elasticClient(t)
 	deleteAllIndices(t, client)
@@ -172,6 +214,7 @@ func initDatastore(t *testing.T, i interface{}) (*elastic.Client, *elasticorm.Da
 func elasticClient(t *testing.T) *elastic.Client {
 	client, err := elastic.NewClient(
 		elastic.SetURL(elasticSearchURL),
+		elastic.SetTraceLog(fileLogger(`elastic-trace.log`)),
 	)
 	if err != nil {
 		t.Logf(
@@ -182,6 +225,15 @@ func elasticClient(t *testing.T) *elastic.Client {
 		t.FailNow()
 	}
 	return client
+}
+
+func fileLogger(name string) *log.Logger {
+	f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE, 0755)
+	if err != nil {
+		panic(err)
+	}
+	logger := log.New(f, ``, log.LstdFlags)
+	return logger
 }
 
 func deleteAllIndices(t *testing.T, c *elastic.Client) {
