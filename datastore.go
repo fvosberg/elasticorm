@@ -27,6 +27,9 @@ func NewDatastore(esc *elastic.Client, options ...DatastoreOptFunc) (*Datastore,
 // DatastoreOptFunc is used as a parameter to NewDatastore and provides a way of configuration
 type DatastoreOptFunc func(*Datastore) error
 
+// QueryOptFunc is used as a parameter
+type QueryOptFunc func(*elastic.SearchService) error
+
 // Datstore is an instance to communicate easy with elasticsearch
 // It is meant to be used for one struct and helps storing and retrieving it in/from elasticsearch
 // It leverages the great elastic package from olivere
@@ -262,6 +265,44 @@ func (ds *Datastore) FindOneBy(fieldName string, value interface{}, result inter
 	return ds.decodeElasticResponse(res.Hits.Hits[0].Source, res.Hits.Hits[0].Id, result)
 }
 
+func (ds *Datastore) FindAll(offset int, limit int, results interface{}, opts ...QueryOptFunc) error {
+	q := ds.elasticClient.Search().
+		Index(ds.indexName).
+		Query(elastic.NewMatchAllQuery()).
+		From(0).Size(100)
+
+	for _, opt := range opts {
+		err := opt(q)
+		if err != nil {
+			return err
+		}
+	}
+
+	res, err := q.Do(ds.Ctx)
+	if err != nil {
+		return err
+	}
+	if res.TotalHits() < 1 {
+		return ErrNotFound
+	}
+	return ds.decodeElasticResponses(res.Hits.Hits, results)
+}
+
+func (ds *Datastore) SetSorting(fieldName string, order string) QueryOptFunc {
+	return func(srv *elastic.SearchService) error {
+		if order != `asc` && order != `desc` {
+			return errors.New(`sorting order must be asc or desc`)
+		}
+		elasticFieldName, err := ds.indexDefinition.elasticFieldName(ds.typeName, fieldName)
+		// TODO loosen coupling with indexDefinition
+		if err != nil {
+			return err
+		}
+		srv.Sort(elasticFieldName+`.raw`, order == `asc`)
+		return nil
+	}
+}
+
 type BoundingBox struct {
 	Top    float64
 	Left   float64
@@ -306,23 +347,19 @@ func (ds *Datastore) FindByGeoBoundingBox(fieldName string, box BoundingBox, res
 func (ds *Datastore) decodeElasticResponses(hits []*elastic.SearchHit, results interface{}) error {
 	resultsv := reflect.ValueOf(results)
 	if resultsv.Kind() != reflect.Ptr || resultsv.Elem().Kind() != reflect.Slice {
-		panic("result argument must be a slice address")
+		return errors.New("result argument must be a slice address")
 	}
 
 	slicev := resultsv.Elem()
-	slicev = slicev.Slice(0, slicev.Cap())
 	elemt := slicev.Type().Elem()
 
 	for _, hit := range hits {
 		elemp := reflect.New(elemt)
-
 		err := ds.decodeElasticResponse(hit.Source, hit.Id, elemp.Interface())
 		if err != nil {
 			return err
 		}
-
 		slicev = reflect.Append(slicev, elemp.Elem())
-		slicev = slicev.Slice(0, slicev.Cap())
 	}
 
 	resultsv.Elem().Set(slicev.Slice(0, len(hits)))

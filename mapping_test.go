@@ -1,6 +1,7 @@
 package elasticorm_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -202,6 +203,18 @@ var mappingTestCases []mappingTestCase = []mappingTestCase{
 		ExpectedJSON:  `{"properties":{"coffees":{"type":"nested","properties":{"brand":{"type":"keyword"}}},"first_name":{"type":"text"}}}`,
 		ExpectedError: nil,
 	},
+	mappingTestCase{
+		Title: `For a struct with a sortable text field`,
+		Input: func() interface{} {
+			type User struct {
+				FirstName string `json:"first_name" elasticorm:"sortable"`
+			}
+			return &User{}
+		}(),
+		ExpectedJSON:  `{"properties":{"first_name":{"type":"text","fields":{"raw":{"type":"keyword"}}}}}`,
+		ExpectedError: nil,
+		// TODO sortable as tag for a keyword field
+	},
 	/*
 		TODO
 		{
@@ -219,6 +232,7 @@ func TestNewMappingFromStruct(t *testing.T) {
 			actualJSON, err := json.Marshal(mapping)
 			ok(t, err)
 
+			fmt.Printf("expected err: %#v", actErr)
 			if tt.ExpectedError != nil && actErr != nil {
 				equals(t, tt.ExpectedError.Error(), actErr.Error())
 			} else {

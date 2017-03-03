@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -196,6 +197,35 @@ func TestFindByGeoBoundingBox(t *testing.T) {
 
 	equals(t, 1, len(found))
 	equals(t, "Juister", found[0].Name)
+}
+
+func TestFindAll(t *testing.T) {
+	type User struct {
+		ID   string `json:"id" elasticorm:"id"`
+		Name string `json:"name" elasticorm:"type=text,sortable"` // TODO error on not sorted | test with keyword
+	}
+
+	_, ds := initDatastore(t, &User{})
+	err := ds.CleanUp()
+	ok(t, err)
+	for i := 0; i < 10; i++ {
+		err := ds.Create(&User{
+			Name: fmt.Sprintf("Unknown No. %d", i),
+		})
+		ok(t, err)
+		// refresh after each creation to get the desired sorting
+		ds.Refresh()
+	}
+
+	found := []User{}
+	err = ds.FindAll(0, 10, &found, ds.SetSorting(`Name`, `asc`))
+	ok(t, err)
+
+	equals(t, 10, len(found))
+	fmt.Printf("%#v\n", found)
+	for i := 0; i < 10; i++ {
+		equals(t, found[i].Name, fmt.Sprintf("Unknown No. %d", i))
+	}
 }
 
 func initDatastore(t *testing.T, i interface{}) (*elastic.Client, *elasticorm.Datastore) {

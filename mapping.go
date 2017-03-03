@@ -36,6 +36,7 @@ type MappingFieldConfig struct {
 	Analyzer        string                        `json:"analyzer,omitempty"`
 	structFieldName string                        `json:"-"`
 	Properties      map[string]MappingFieldConfig `json:"properties,omitempty"`
+	Fields          map[string]MappingFieldConfig `json:"fields,omitempty"`
 }
 
 // MappingFromStruct returns the MappingConfig for a passed in struct (pointer). The mapping is configurable via json tags, which can change the name of the field, and elasticorm tags. The elasticorm tags can include
@@ -76,6 +77,8 @@ func mappingForField(field reflect.StructField) (MappingFieldConfig, error) {
 				propMapping.Type = value
 			case `analyzer`:
 				propMapping.Analyzer = value
+			case `sortable`:
+				propMapping.Fields = rawFieldForField(field)
 			case `id`:
 			default:
 				err = errors.Wrap(ErrInvalidOption, fmt.Sprintf("parsing option %s=%s failed", name, value))
@@ -138,6 +141,14 @@ func propertiesForField(f reflect.StructField) (map[string]MappingFieldConfig, e
 		}
 	}
 	return properties, err
+}
+
+func rawFieldForField(f reflect.StructField) map[string]MappingFieldConfig {
+	cfg := make(map[string]MappingFieldConfig, 1)
+	cfg[`raw`] = MappingFieldConfig{
+		Type: `keyword`,
+	}
+	return cfg
 }
 
 func shouldMapField(f reflect.StructField) bool {
