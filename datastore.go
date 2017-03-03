@@ -282,9 +282,6 @@ func (ds *Datastore) FindAll(offset int, limit int, results interface{}, opts ..
 	if err != nil {
 		return err
 	}
-	if res.TotalHits() < 1 {
-		return ErrNotFound
-	}
 	return ds.decodeElasticResponses(res.Hits.Hits, results)
 }
 
