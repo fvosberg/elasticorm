@@ -226,7 +226,18 @@ var mappingTestCases []mappingTestCase = []mappingTestCase{
 		}(),
 		ExpectedJSON:  `{"properties":{"first_name":{"type":"text"},"interests":{"type":"text"}}}`,
 		ExpectedError: nil,
-		// TODO sortable as tag for a keyword field
+	},
+	mappingTestCase{
+		Title: `For a struct with a boolean`,
+		Input: func() interface{} {
+			type User struct {
+				FirstName string `json:"first_name"`
+				IsActive  bool   `json:"is_active"`
+			}
+			return &User{}
+		}(),
+		ExpectedJSON:  `{"properties":{"first_name":{"type":"text"},"is_active":{"type":"boolean"}}}`,
+		ExpectedError: nil,
 	},
 	/*
 		TODO

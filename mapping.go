@@ -111,6 +111,8 @@ func elasticTypeForGoType(t reflect.Type) string {
 		return subtype
 	case reflect.Struct:
 		return `object`
+	case reflect.Bool:
+		return `boolean`
 	default:
 		return `text`
 	}
