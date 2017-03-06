@@ -239,6 +239,23 @@ var mappingTestCases []mappingTestCase = []mappingTestCase{
 		ExpectedJSON:  `{"properties":{"first_name":{"type":"text"},"is_active":{"type":"boolean"}}}`,
 		ExpectedError: nil,
 	},
+	mappingTestCase{
+		Title: `For a struct with numeric types`,
+		Input: func() interface{} {
+			type User struct {
+				Float32   float32 `json:"float_32"`
+				Float64   float64 `json:"float_64"`
+				Integer   int     `json:"integer"`
+				Integer16 int16   `json:"integer_16"`
+				Integer32 int32   `json:"integer_32"`
+				Integer64 int64   `json:"integer_64"`
+				Integer8  int8    `json:"integer_8"`
+			}
+			return &User{}
+		}(),
+		ExpectedJSON:  `{"properties":{"float_32":{"type":"float"},"float_64":{"type":"double"},"integer":{"type":"integer"},"integer_16":{"type":"short"},"integer_32":{"type":"integer"},"integer_64":{"type":"long"},"integer_8":{"type":"byte"}}}`,
+		ExpectedError: nil,
+	},
 	/*
 		TODO
 		{

@@ -113,6 +113,20 @@ func elasticTypeForGoType(t reflect.Type) string {
 		return `object`
 	case reflect.Bool:
 		return `boolean`
+	case reflect.Float32:
+		return `float`
+	case reflect.Float64:
+		return `double`
+	case reflect.Int8:
+		return `byte`
+	case reflect.Int16:
+		return `short`
+	case reflect.Int32:
+		fallthrough
+	case reflect.Int:
+		return `integer`
+	case reflect.Int64:
+		return `long`
 	default:
 		return `text`
 	}
