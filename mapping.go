@@ -89,19 +89,26 @@ func mappingForField(field reflect.StructField) (MappingFieldConfig, error) {
 }
 
 func typeForField(f reflect.StructField) string {
-	t := f.Type
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
 	if val, ok := optionValueForField(f, `type`); ok {
 		return val
+	}
+	return elasticTypeForGoType(f.Type)
+}
+
+func elasticTypeForGoType(t reflect.Type) string {
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
 	}
 	if t.PkgPath() == `time` && t.Name() == `Time` {
 		return `date`
 	}
 	switch t.Kind() {
 	case reflect.Slice:
-		return `nested`
+		subtype := elasticTypeForGoType(t.Elem())
+		if subtype == `object` {
+			return `nested`
+		}
+		return subtype
 	case reflect.Struct:
 		return `object`
 	default:

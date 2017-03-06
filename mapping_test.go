@@ -215,6 +215,19 @@ var mappingTestCases []mappingTestCase = []mappingTestCase{
 		ExpectedError: nil,
 		// TODO sortable as tag for a keyword field
 	},
+	mappingTestCase{
+		Title: `For a struct with a slice of strings`,
+		Input: func() interface{} {
+			type User struct {
+				FirstName string   `json:"first_name"`
+				Interests []string `json:"interests"`
+			}
+			return &User{}
+		}(),
+		ExpectedJSON:  `{"properties":{"first_name":{"type":"text"},"interests":{"type":"text"}}}`,
+		ExpectedError: nil,
+		// TODO sortable as tag for a keyword field
+	},
 	/*
 		TODO
 		{
