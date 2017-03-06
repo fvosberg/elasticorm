@@ -199,6 +199,43 @@ func TestFindByGeoBoundingBox(t *testing.T) {
 	equals(t, "Juister", found[0].Name)
 }
 
+func TestFindByGeoDistance(t *testing.T) {
+	type Location struct {
+		Lat float64 `json:"lat"`
+		Lon float64 `json:"lon"`
+	}
+	type Isle struct {
+		ID       string    `json:"id" elasticorm:"id"`
+		Name     string    `json:"name"`
+		Location *Location `json:"loc" elasticorm:"type=geo_point"`
+	}
+
+	_, ds := initDatastore(t, &Isle{})
+	err := ds.Create(&Isle{Name: "Memmert", Location: &Location{Lat: 53.640652, Lon: 6.887995}})
+	ok(t, err)
+	err = ds.Create(&Isle{Name: "Juist", Location: &Location{Lat: 53.681747, Lon: 7.008158}})
+	ok(t, err)
+	err = ds.Create(&Isle{Name: "Borkum", Location: &Location{Lat: 53.640652, Lon: 6.887995}})
+	ok(t, err)
+	err = ds.Create(&Isle{Name: "Langeoog", Location: &Location{Lat: 53.743725, Lon: 7.481725}})
+	ok(t, err)
+	ds.Refresh()
+
+	found := []Isle{}
+	err = ds.FindByGeoDistance(
+		`Location`,
+		53.666499,
+		7.050261,
+		`11.1km`,
+		&found,
+	)
+	ok(t, err)
+
+	equals(t, 3, len(found))
+	equals(t, "Juist", found[0].Name)
+	equals(t, "Memmert", found[1].Name)
+}
+
 func TestFindAll(t *testing.T) {
 	assertions := []struct {
 		Offset        int

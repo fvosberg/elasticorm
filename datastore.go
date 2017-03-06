@@ -334,8 +334,29 @@ func (ds *Datastore) FindByGeoBoundingBox(fieldName string, box BoundingBox, res
 	if err != nil {
 		return err
 	}
-	if res.TotalHits() < 1 {
-		return ErrNotFound
+
+	return ds.decodeElasticResponses(res.Hits.Hits, results)
+}
+
+func (ds *Datastore) FindByGeoDistance(fieldName string, lat float64, lon float64, distance string, results interface{}) error {
+	elasticFieldName, err := ds.indexDefinition.elasticFieldName(ds.typeName, fieldName)
+	if err != nil {
+		return err
+	}
+	query := elastic.NewGeoDistanceQuery(elasticFieldName).
+		Lat(lat).
+		Lon(lon).
+		Distance(distance)
+
+	res, err := ds.elasticClient.Search().
+		Index(ds.indexName).
+		// TODO query type
+		Query(query).
+		SortBy(elastic.NewGeoDistanceSort(elasticFieldName).Point(lat, lon)).
+		Do(ds.Ctx)
+
+	if err != nil {
+		return err
 	}
 
 	return ds.decodeElasticResponses(res.Hits.Hits, results)
