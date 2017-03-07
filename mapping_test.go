@@ -1,7 +1,6 @@
 package elasticorm_test
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -273,7 +272,6 @@ func TestNewMappingFromStruct(t *testing.T) {
 			actualJSON, err := json.Marshal(mapping)
 			ok(t, err)
 
-			fmt.Printf("expected err: %#v", actErr)
 			if tt.ExpectedError != nil && actErr != nil {
 				equals(t, tt.ExpectedError.Error(), actErr.Error())
 			} else {
