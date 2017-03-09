@@ -246,19 +246,28 @@ func (ds *Datastore) Update(o interface{}) error {
 	return err
 }
 
-func (ds *Datastore) FindOneBy(fieldName string, value interface{}, result interface{}) error {
+func (ds *Datastore) FindOneBy(fieldName string, value interface{}, result interface{}, opts ...QueryOptFunc) error {
 	elasticFieldName, err := ds.indexDefinition.elasticFieldName(ds.typeName, fieldName)
 	if err != nil {
 		return err
 	}
-	res, err := ds.elasticClient.Search().
+	q := ds.elasticClient.Search().
 		Index(ds.indexName).
 		Query(elastic.NewBoolQuery().Filter(elastic.NewTermQuery(elasticFieldName, value))).
-		From(0).Size(1).
-		Do(ds.Ctx)
+		From(0).Size(1)
+
+	for _, opt := range opts {
+		err := opt(q)
+		if err != nil {
+			return err
+		}
+	}
+
+	res, err := q.Do(ds.Ctx)
 	if err != nil {
 		return err
 	}
+
 	if res.TotalHits() < 1 {
 		return ErrNotFound
 	}

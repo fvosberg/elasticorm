@@ -101,61 +101,98 @@ func TestDatastoreUpdateAUser(t *testing.T) {
 func TestDatastoreFindOneBy(t *testing.T) {
 	type User struct {
 		ID        string `json:"id" elasticorm:"id"`
-		FirstName string `json:"first_name"`
+		FirstName string `json:"first_name" elasticorm:"sortable"`
 		Email     string `json:"email" elasticorm:"type=keyword"`
 	}
 	tests := []struct {
 		title         string
-		user          User
+		users         []User
 		searchField   string
 		searchValue   string
-		shouldFind    bool
+		shouldFind    User
 		expectedError error
+		SortBy        string
+		Ordering      string
 	}{
 		{
-			title:       `Find a user by email`,
-			user:        User{FirstName: `The first name`, Email: `foo@bar.com`},
+			title: `Find a user by email`,
+			users: []User{
+				User{FirstName: `Wrong user`, Email: `wrong1@bar.com`},
+				User{FirstName: `The first name`, Email: `foo@bar.com`},
+				User{FirstName: `Wrong user`, Email: `wrong2@bar.com`},
+			},
 			searchField: `Email`,
 			searchValue: `foo@bar.com`,
-			shouldFind:  true,
+			shouldFind:  User{FirstName: `The first name`, Email: `foo@bar.com`},
 		},
 		{
 			title:         `Don't find a user by wrong email`,
-			user:          User{FirstName: `The first name`, Email: `foo@bar.com`},
+			users:         []User{User{FirstName: `The first name`, Email: `foo@bar.com`}},
 			searchField:   `Email`,
 			searchValue:   `bar@foo.com`,
-			shouldFind:    false,
+			shouldFind:    User{},
 			expectedError: elasticorm.ErrNotFound,
 		},
 		{
 			title:         `Search for a field which doesn't exist`,
-			user:          User{FirstName: `The first name`, Email: `foo@bar.com`},
+			users:         []User{User{FirstName: `The first name`, Email: `foo@bar.com`}},
 			searchField:   `email`,
 			searchValue:   `foo@bar.com`,
-			shouldFind:    false,
+			shouldFind:    User{},
 			expectedError: errors.New(`Mapping configuration has no mapping for struct field`),
+		},
+		{
+			title: `Search with sort - asc`,
+			users: []User{
+				User{FirstName: `ABC`, Email: `match@bar.com`},
+				User{FirstName: `DEF`, Email: `not@bar.com`},
+				User{FirstName: `GHI`, Email: `match@bar.com`},
+			},
+			searchField: `Email`,
+			searchValue: `match@bar.com`,
+			shouldFind:  User{FirstName: `ABC`, Email: `match@bar.com`},
+			SortBy:      `FirstName`,
+			Ordering:    `asc`,
+		},
+		{
+			title: `Search with sort - desc`,
+			users: []User{
+				User{FirstName: `ABC`, Email: `match@bar.com`},
+				User{FirstName: `DEF`, Email: `not@bar.com`},
+				User{FirstName: `GHI`, Email: `match@bar.com`},
+			},
+			searchField: `Email`,
+			searchValue: `match@bar.com`,
+			shouldFind:  User{FirstName: `GHI`, Email: `match@bar.com`},
+			SortBy:      `FirstName`,
+			Ordering:    `desc`,
 		},
 	}
 
 	for _, tt := range tests {
-		elasticClient, ds := initDatastore(t, &User{})
-		err := ds.Create(&tt.user)
-		ok(t, err)
-		elasticClient.Refresh().Do(context.Background())
+		t.Run(tt.title, func(t *testing.T) {
+			elasticClient, ds := initDatastore(t, &User{})
+			for _, user := range tt.users {
+				err := ds.Create(&user)
+				ok(t, err)
+				elasticClient.Refresh().Do(context.Background())
+			}
 
-		found := User{}
-		err = ds.FindOneBy(tt.searchField, tt.searchValue, &found)
+			found := User{}
+			opts := []elasticorm.QueryOptFunc{}
+			if tt.SortBy != `` || tt.Ordering != `` {
+				opts = append(opts, ds.SetSorting(tt.SortBy, tt.Ordering))
+			}
+			err := ds.FindOneBy(tt.searchField, tt.searchValue, &found, opts...)
 
-		if tt.expectedError != nil {
-			equals(t, tt.expectedError.Error(), err.Error())
-		} else {
-			ok(t, err)
-		}
-		if tt.shouldFind {
-			equals(t, tt.user, found)
-		} else {
-			equals(t, User{}, found)
-		}
+			if tt.expectedError != nil {
+				equals(t, tt.expectedError.Error(), err.Error())
+			} else {
+				ok(t, err)
+			}
+			tt.shouldFind.ID = found.ID
+			equals(t, tt.shouldFind, found)
+		})
 	}
 }
 
