@@ -252,7 +252,7 @@ func TestFindByGeoDistance(t *testing.T) {
 	ok(t, err)
 	err = ds.Create(&Isle{Name: "Juist", Location: &Location{Lat: 53.681747, Lon: 7.008158}})
 	ok(t, err)
-	err = ds.Create(&Isle{Name: "Borkum", Location: &Location{Lat: 53.640652, Lon: 6.887995}})
+	err = ds.Create(&Isle{Name: "Borkum", Location: &Location{Lat: 53.600230, Lon: 6.711053}})
 	ok(t, err)
 	err = ds.Create(&Isle{Name: "Langeoog", Location: &Location{Lat: 53.743725, Lon: 7.481725}})
 	ok(t, err)
@@ -268,7 +268,7 @@ func TestFindByGeoDistance(t *testing.T) {
 	)
 	ok(t, err)
 
-	equals(t, 3, len(found))
+	equals(t, 2, len(found))
 	equals(t, "Juist", found[0].Name)
 	equals(t, "Memmert", found[1].Name)
 }
