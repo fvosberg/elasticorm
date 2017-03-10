@@ -308,6 +308,20 @@ func (ds *Datastore) SetSorting(fieldName string, order string) QueryOptFunc {
 	}
 }
 
+func (ds *Datastore) FilterByField(fieldName string, value interface{}) QueryOptFunc {
+	return func(srv *elastic.SearchService) error {
+		// TODO loosen coupling with indexDefinition
+		elasticFieldName, err := ds.indexDefinition.elasticFieldName(ds.typeName, fieldName)
+		if err != nil {
+			return err
+		}
+		q := elastic.NewBoolQuery()
+		q.Filter(elastic.NewTermQuery(elasticFieldName, value))
+		srv.Query(q)
+		return nil
+	}
+}
+
 func (ds *Datastore) Offset(offset int) QueryOptFunc {
 	return func(srv *elastic.SearchService) error {
 		srv.From(offset)

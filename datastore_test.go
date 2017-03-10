@@ -363,6 +363,47 @@ func TestFindAll(t *testing.T) {
 	}
 }
 
+func TestFilterFindAll(t *testing.T) {
+	type User struct {
+		ID     string `json:"id" elasticorm:"id"`
+		Name   string `json:"name"`
+		Gender string `json:"gender" elasticorm:"type=keyword"` // TODO what are the edge cases
+	}
+
+	_, ds := initDatastore(t, &User{})
+	err := ds.CleanUp()
+	ok(t, err)
+
+	err = ds.Create(&User{
+		Name:   "Unknown No. 1",
+		Gender: `female`,
+	})
+	ok(t, err)
+	ds.Refresh() // refresh after each creation to get the desired sorting
+	err = ds.Create(&User{
+		Name:   "Unknown No. 2",
+		Gender: `male`,
+	})
+	ok(t, err)
+	ds.Refresh() // refresh after each creation to get the desired sorting
+	err = ds.Create(&User{
+		Name:   "Unknown No. 3",
+		Gender: `female`,
+	})
+	ok(t, err)
+	ds.Refresh() // refresh after each creation to get the desired sorting
+
+	found := []User{}
+	err = ds.FindAll(
+		&found,
+		ds.FilterByField(`Gender`, `female`),
+	)
+
+	equals(t, 2, len(found))
+	equals(t, `Unknown No. 1`, found[0].Name)
+	equals(t, `Unknown No. 3`, found[1].Name)
+}
+
 func initDatastore(t *testing.T, i interface{}) (*elastic.Client, *elasticorm.Datastore) {
 	client := elasticClient(t)
 	deleteAllIndices(t, client)
