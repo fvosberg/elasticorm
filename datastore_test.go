@@ -348,7 +348,12 @@ func TestFindAll(t *testing.T) {
 
 	for _, a := range assertions {
 		found := []User{}
-		err = ds.FindAll(a.Offset, a.Limit, &found, ds.SetSorting(`Name`, a.Order))
+		err = ds.FindAll(
+			&found,
+			ds.Offset(a.Offset),
+			ds.Limit(a.Limit),
+			ds.SetSorting(`Name`, a.Order),
+		)
 		ok(t, err)
 
 		equals(t, len(found), len(a.ExpectedNames))

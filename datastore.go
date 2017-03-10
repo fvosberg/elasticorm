@@ -274,11 +274,10 @@ func (ds *Datastore) FindOneBy(fieldName string, value interface{}, result inter
 	return ds.decodeElasticResponse(res.Hits.Hits[0].Source, res.Hits.Hits[0].Id, result)
 }
 
-func (ds *Datastore) FindAll(offset int, limit int, results interface{}, opts ...QueryOptFunc) error {
+func (ds *Datastore) FindAll(results interface{}, opts ...QueryOptFunc) error {
 	q := ds.elasticClient.Search().
 		Index(ds.indexName).
-		Query(elastic.NewMatchAllQuery()).
-		From(offset).Size(limit)
+		Query(elastic.NewMatchAllQuery())
 
 	for _, opt := range opts {
 		err := opt(q)
@@ -305,6 +304,20 @@ func (ds *Datastore) SetSorting(fieldName string, order string) QueryOptFunc {
 			return err
 		}
 		srv.Sort(elasticFieldName+`.raw`, order == `asc`)
+		return nil
+	}
+}
+
+func (ds *Datastore) Offset(offset int) QueryOptFunc {
+	return func(srv *elastic.SearchService) error {
+		srv.From(offset)
+		return nil
+	}
+}
+
+func (ds *Datastore) Limit(limit int) QueryOptFunc {
+	return func(srv *elastic.SearchService) error {
+		srv.Size(limit)
 		return nil
 	}
 }
