@@ -22,8 +22,22 @@ func (m *MappingConfig) AddField(name string, cfg MappingFieldConfig) {
 }
 
 func (m MappingConfig) elasticFieldName(structFieldName string) (string, error) {
-	for propertyName, propertyMapping := range m.Properties {
+	return elasticFieldNameFromMappingFieldConfigs(m.Properties, structFieldName)
+}
+
+func elasticFieldNameFromMappingFieldConfigs(fieldConfigs map[string]MappingFieldConfig, structFieldName string) (string, error) {
+	structFieldNameParts := strings.Split(structFieldName, `.`)
+	structFieldName = structFieldNameParts[0]
+	for propertyName, propertyMapping := range fieldConfigs {
 		if propertyMapping.structFieldName == structFieldName {
+			if len(structFieldNameParts) > 1 {
+				subStructFieldPath := strings.Join(structFieldNameParts[1:], `.`)
+				subElasticFieldPath, err := elasticFieldNameFromMappingFieldConfigs(propertyMapping.Properties, subStructFieldPath)
+				if err != nil {
+					return ``, err
+				}
+				propertyName = fmt.Sprintf("%s.%s", propertyName, subElasticFieldPath)
+			}
 			return propertyName, nil
 		}
 	}

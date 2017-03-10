@@ -364,44 +364,76 @@ func TestFindAll(t *testing.T) {
 }
 
 func TestFilterFindAll(t *testing.T) {
+	type Beverage struct {
+		Type string `json:"type" elasticorm:"type=keyword"`
+	}
+
 	type User struct {
-		ID     string `json:"id" elasticorm:"id"`
-		Name   string `json:"name"`
-		Gender string `json:"gender" elasticorm:"type=keyword"` // TODO what are the edge cases
+		ID       string   `json:"id" elasticorm:"id"`
+		Name     string   `json:"name" elasticorm:"sortable"`
+		Gender   string   `json:"gender" elasticorm:"type=keyword"` // TODO what are the edge cases
+		Beverage Beverage `json:"beverage"`
 	}
 
 	_, ds := initDatastore(t, &User{})
-	err := ds.CleanUp()
-	ok(t, err)
 
-	err = ds.Create(&User{
-		Name:   "Unknown No. 1",
-		Gender: `female`,
-	})
-	ok(t, err)
-	ds.Refresh() // refresh after each creation to get the desired sorting
-	err = ds.Create(&User{
-		Name:   "Unknown No. 2",
-		Gender: `male`,
-	})
-	ok(t, err)
-	ds.Refresh() // refresh after each creation to get the desired sorting
-	err = ds.Create(&User{
-		Name:   "Unknown No. 3",
-		Gender: `female`,
-	})
-	ok(t, err)
-	ds.Refresh() // refresh after each creation to get the desired sorting
+	tests := []struct {
+		FilterFunc elasticorm.QueryOptFunc
+		FoundNames []string
+	}{
+		{
+			FilterFunc: ds.FilterByField(`Gender`, `female`),
+			FoundNames: []string{`Unknown No. 1`, `Unknown No. 3`},
+		},
+		{
+			FilterFunc: ds.FilterByField(`Beverage.Type`, `beer`),
+			FoundNames: []string{`Unknown No. 1`, `Unknown No. 2`},
+		},
+	}
 
-	found := []User{}
-	err = ds.FindAll(
-		&found,
-		ds.FilterByField(`Gender`, `female`),
-	)
+	for _, test := range tests {
+		err := ds.CleanUp()
+		ok(t, err)
 
-	equals(t, 2, len(found))
-	equals(t, `Unknown No. 1`, found[0].Name)
-	equals(t, `Unknown No. 3`, found[1].Name)
+		err = ds.Create(&User{
+			Name:   "Unknown No. 1",
+			Gender: `female`,
+			Beverage: Beverage{
+				Type: `beer`,
+			},
+		})
+		ok(t, err)
+		err = ds.Create(&User{
+			Name:   "Unknown No. 2",
+			Gender: `male`,
+			Beverage: Beverage{
+				Type: `beer`,
+			},
+		})
+		ok(t, err)
+		err = ds.Create(&User{
+			Name:   "Unknown No. 3",
+			Gender: `female`,
+			Beverage: Beverage{
+				Type: `coffee`,
+			},
+		})
+		ok(t, err)
+		ds.Refresh()
+
+		found := []User{}
+		err = ds.FindAll(
+			&found,
+			test.FilterFunc,
+			ds.SetSorting(`Name`, `asc`),
+		)
+		ok(t, err)
+
+		equals(t, len(test.FoundNames), len(found))
+		for k, name := range test.FoundNames {
+			equals(t, name, found[k].Name)
+		}
+	}
 }
 
 func initDatastore(t *testing.T, i interface{}) (*elastic.Client, *elasticorm.Datastore) {
