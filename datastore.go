@@ -139,8 +139,16 @@ func ForStruct(i interface{}) DatastoreOptFunc {
 			return err
 		}
 		ds.indexDefinition = indexDefinition
-		// TODO configure ID
-		ds.idFieldName = `ID`
+		if ds.idFieldName == "" {
+			ds.idFieldName = "ID"
+		}
+		return nil
+	}
+}
+
+func WithIDField(name string) DatastoreOptFunc {
+	return func(ds *Datastore) error {
+		ds.idFieldName = name
 		return nil
 	}
 }
