@@ -12,16 +12,34 @@ import (
 )
 
 // NewDatastore returns a fresh instance of an elasticorm datastore
-func NewDatastore(esc *elastic.Client, options ...DatastoreOptFunc) (*Datastore, error) {
+func NewDatastore(esc *elastic.Client, opts ...DatastoreOptFunc) (*Datastore, error) {
 	ds := &Datastore{
 		elasticClient: esc,
 		Ctx:           context.Background(),
 	}
 	var err error
-	for _, opt := range options {
+	for _, opt := range opts {
 		err = opt(ds)
 	}
 	return ds, err
+}
+
+func NewDatastoreForURL(URL string, opts ...DatastoreOptFunc) (*Datastore, error) {
+	esc, err := elasticClient(URL)
+	if err != nil {
+		return nil, err
+	}
+	return NewDatastore(esc, opts...)
+}
+
+func elasticClient(URL string) (*elastic.Client, error) {
+	c, err := elastic.NewClient(
+		elastic.SetURL(URL),
+	)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed connecting to elasticsearch via \"%s\"", URL)
+	}
+	return c, nil
 }
 
 // DatastoreOptFunc is used as a parameter to NewDatastore and provides a way of configuration
