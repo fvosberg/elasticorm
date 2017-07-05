@@ -13,6 +13,27 @@ type MappingConfig struct {
 	Properties map[string]MappingFieldConfig `json:"properties,omitempty"`
 }
 
+func (m *MappingConfig) Analyzers() []string {
+	list := make(map[string]bool, 0)
+	for _, pm := range m.Properties {
+		addAnalyzers(list, pm)
+	}
+	analyzers := make([]string, 0)
+	for name, _ := range list {
+		analyzers = append(analyzers, name)
+	}
+	return analyzers
+}
+
+func addAnalyzers(res map[string]bool, mapping MappingFieldConfig) {
+	if mapping.Analyzer != "" {
+		res[mapping.Analyzer] = true
+	}
+	for _, m := range mapping.Properties {
+		addAnalyzers(res, m)
+	}
+}
+
 // AddField adds a new field to the mapping
 func (m *MappingConfig) AddField(name string, cfg MappingFieldConfig) {
 	if m.Properties == nil {
@@ -94,8 +115,31 @@ func mappingForField(field reflect.StructField) (MappingFieldConfig, error) {
 			case `sortable`:
 				propMapping.Fields = rawFieldForField(field)
 			case `id`:
+			case "ref_id":
+				propMapping.Type = "keyword"
+				if propMapping.Analyzer == "case_insensitive_ref_id" {
+					propMapping.Type = "text"
+				}
+			case `case_sensitive`:
+				if value != "true" && value != "false" {
+					return propMapping, errors.Wrap(ErrInvalidOption, "flag case_sensitive must be true or false")
+				}
+				if propMapping.Analyzer != "" && value == "false" {
+					return propMapping, errors.Wrap(ErrInvalidOption, fmt.Sprintf(
+						`trying to set case_sensitivity to false on \"%s\" while the analyzer is already set to \"%s\"`,
+						field.Name,
+						propMapping.Analyzer,
+					))
+
+				}
+				if value == "false" {
+					propMapping.Analyzer = "case_insensitive_ref_id"
+					if propMapping.Type == "keyword" {
+						propMapping.Type = "text"
+					}
+				}
 			default:
-				err = errors.Wrap(ErrInvalidOption, fmt.Sprintf("parsing option %s=%s failed", name, value))
+				return propMapping, errors.Wrap(ErrInvalidOption, fmt.Sprintf("parsing option %s=%s failed", name, value))
 			}
 		}
 	}
@@ -201,7 +245,7 @@ func optionsFromTag(tag string) map[string]string {
 		if len(kv) > 1 {
 			options[kv[0]] = kv[1]
 		} else {
-			options[kv[0]] = ``
+			options[kv[0]] = "true"
 		}
 	}
 	return options

@@ -58,7 +58,7 @@ type Datastore struct {
 	goType          reflect.Type
 	idFieldName     string          // the name of the structs field to store the ID
 	typeName        string          // in elasticsearch
-	indexDefinition IndexDefinition // in elasticsearch
+	IndexDefinition IndexDefinition // in elasticsearch
 }
 
 // EnsureIndexExists checks wether the needed index for this datastore exists. It it doesn't it gets created
@@ -84,7 +84,7 @@ func (ds *Datastore) EnsureIndexExists() error {
 }
 
 func (ds *Datastore) createIndex() error {
-	JSON, err := json.Marshal(ds.indexDefinition)
+	JSON, err := json.Marshal(ds.IndexDefinition)
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func ForStruct(i interface{}) DatastoreOptFunc {
 		if err != nil {
 			return err
 		}
-		ds.indexDefinition = indexDefinition
+		ds.IndexDefinition = indexDefinition
 		if ds.idFieldName == "" {
 			ds.idFieldName = "ID"
 		}
@@ -273,7 +273,7 @@ func (ds *Datastore) Update(o interface{}) error {
 }
 
 func (ds *Datastore) FindOneBy(fieldName string, value interface{}, result interface{}, opts ...QueryOptFunc) error {
-	elasticFieldName, err := ds.indexDefinition.elasticFieldName(ds.typeName, fieldName)
+	elasticFieldName, err := ds.IndexDefinition.elasticFieldName(ds.typeName, fieldName)
 	if err != nil {
 		return err
 	}
@@ -303,6 +303,7 @@ func (ds *Datastore) FindOneBy(fieldName string, value interface{}, result inter
 func (ds *Datastore) FindAll(results interface{}, opts ...QueryOptFunc) error {
 	q := ds.elasticClient.Search().
 		Index(ds.indexName).
+		Type(ds.typeName).
 		Query(elastic.NewMatchAllQuery())
 
 	for _, opt := range opts {
@@ -324,7 +325,7 @@ func (ds *Datastore) SetSorting(fieldName string, order string) QueryOptFunc {
 		if order != `asc` && order != `desc` {
 			return errors.New(`sorting order must be asc or desc`)
 		}
-		elasticFieldName, err := ds.indexDefinition.elasticFieldName(ds.typeName, fieldName)
+		elasticFieldName, err := ds.IndexDefinition.elasticFieldName(ds.typeName, fieldName)
 		// TODO loosen coupling with indexDefinition
 		if err != nil {
 			return err
@@ -337,7 +338,7 @@ func (ds *Datastore) SetSorting(fieldName string, order string) QueryOptFunc {
 func (ds *Datastore) FilterByField(fieldName string, value interface{}) QueryOptFunc {
 	return func(srv *elastic.SearchService) error {
 		// TODO loosen coupling with indexDefinition
-		elasticFieldName, err := ds.indexDefinition.elasticFieldName(ds.typeName, fieldName)
+		elasticFieldName, err := ds.IndexDefinition.elasticFieldName(ds.typeName, fieldName)
 		if err != nil {
 			return err
 		}
@@ -387,21 +388,27 @@ func (ds *Datastore) FindByGeoBoundingBox(fieldName string, box BoundingBox, res
 		TopLeft(box.Top, box.Left).
 		BottomRight(box.Bottom, box.Right)
 
-	res, err := ds.elasticClient.Search().
+	search := ds.elasticClient.Search().
 		Index(ds.indexName).
-		// TODO query type
-		Query(elastic.NewBoolQuery().Filter(query)).
-		Do(ds.Ctx)
+		Query(elastic.NewBoolQuery().Filter(query))
+
+	for _, opt := range opts {
+		err := opt(search)
+		if err != nil {
+			return err
+		}
+	}
+	res, err := search.Do(ds.Ctx)
 
 	if err != nil {
 		return err
 	}
 
-	return ds.decodeElasticResponses(res.Hits.Hits, results)
+	return ds.decodeElasticResponses(hitsToResults(res.Hits.Hits), results)
 }
 
 func (ds *Datastore) FindByGeoDistance(fieldName string, lat float64, lon float64, distance string, results interface{}) error {
-	elasticFieldName, err := ds.indexDefinition.elasticFieldName(ds.typeName, fieldName)
+	elasticFieldName, err := ds.IndexDefinition.elasticFieldName(ds.typeName, fieldName)
 	if err != nil {
 		return err
 	}

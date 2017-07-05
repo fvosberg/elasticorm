@@ -16,7 +16,7 @@ func TestIndexDefinition(t *testing.T) {
 		{
 			title:        `Empty Index definition`,
 			defFuncs:     []elasticorm.IndexDefinitionFunc{},
-			expectedJSON: `{}`,
+			expectedJSON: `{"settings":{}}`,
 		},
 		{
 			title: `Index definition with number of shards setting`,
@@ -48,6 +48,23 @@ func TestIndexDefinition(t *testing.T) {
 				),
 			},
 			expectedJSON: `{"settings":{"number_of_replicas":2},"mappings":{"customer":{"properties":{"first_name":{"type":"text"},"last_name":{"type":"text"}}}}}`,
+		},
+		{
+			title: `Index definition with a setting and a customer mapping with an case insensitive reference ID`,
+			defFuncs: []elasticorm.IndexDefinitionFunc{
+				elasticorm.SetNumberOfReplicas(2),
+				elasticorm.AddMappingFromStruct(
+					`customer`,
+					(func() interface{} {
+						type User struct {
+							FirstName string `json:"first_name,omitempty"`
+							Email     string `json:"email" elasticorm:"ref_id,case_sensitive=false"`
+						}
+						return &User{}
+					})(),
+				),
+			},
+			expectedJSON: `{"settings":{"number_of_replicas":2,"analysis":{"analyzer":{"case_insensitive_ref_id":{"type":"custom","tokenizer":"keyword","filter":["lowercase"]}}}},"mappings":{"customer":{"properties":{"email":{"type":"text","analyzer":"case_insensitive_ref_id"},"first_name":{"type":"text"}}}}}`,
 		},
 	}
 
