@@ -257,7 +257,7 @@ func (ds *Datastore) Find(ID string, result interface{}) error {
 		return err
 	}
 
-	return ds.decodeElasticResponse(res.Source, res.Id, result)
+	return ds.DecodeElasticResponse(res.Source, res.Id, result)
 }
 
 func (ds *Datastore) FindByIDs(IDs []string, result interface{}) error {
@@ -269,7 +269,7 @@ func (ds *Datastore) FindByIDs(IDs []string, result interface{}) error {
 	if err != nil {
 		return err
 	}
-	return ds.decodeElasticResponses(getsToResults(res.Docs), result)
+	return ds.DecodeElasticResponses(getsToResults(res.Docs), result)
 }
 
 func (ds *Datastore) Update(o interface{}) error {
@@ -319,8 +319,26 @@ func (ds *Datastore) FindOneBy(fieldName string, value interface{}, result inter
 	if res.TotalHits() < 1 {
 		return ErrNotFound
 	}
-	return ds.decodeElasticResponse(res.Hits.Hits[0].Source, res.Hits.Hits[0].Id, result)
+	return ds.DecodeElasticResponse(res.Hits.Hits[0].Source, res.Hits.Hits[0].Id, result)
 }
+
+/*
+func (ds *Datastore) Search(q interface{}, result interface{}) error {
+	query := ds.elasticClient.Search().
+		Index(ds.indexName).
+		Query(q)
+
+	res, err := q.Do(ds.Ctx)
+	if err != nil {
+		return err
+	}
+
+	if res.TotalHits() < 1 {
+		return ErrNotFound
+	}
+	return ds.DecodeElasticResponse(res.Hits.Hits[0].Source, res.Hits.Hits[0].Id, result)
+}
+*/
 
 func (ds *Datastore) FindAll(results interface{}, opts ...QueryOptFunc) error {
 	q := ds.elasticClient.Search().
@@ -339,7 +357,7 @@ func (ds *Datastore) FindAll(results interface{}, opts ...QueryOptFunc) error {
 	if err != nil {
 		return err
 	}
-	return ds.decodeElasticResponses(hitsToResults(res.Hits.Hits), results)
+	return ds.DecodeElasticResponses(hitsToResults(res.Hits.Hits), results)
 }
 
 func (ds *Datastore) FindFiltered(results interface{}, mustFilters map[string]interface{}, opts ...QueryOptFunc) error {
@@ -364,7 +382,7 @@ func (ds *Datastore) FindFiltered(results interface{}, mustFilters map[string]in
 	if err != nil {
 		return err
 	}
-	return ds.decodeElasticResponses(hitsToResults(res.Hits.Hits), results)
+	return ds.DecodeElasticResponses(hitsToResults(res.Hits.Hits), results)
 }
 
 func (ds *Datastore) FindNestedFiltered(results interface{}, path string, mustFilters map[string]string, opts ...QueryOptFunc) error {
@@ -384,7 +402,7 @@ func (ds *Datastore) FindNestedFiltered(results interface{}, path string, mustFi
 	if err != nil {
 		return err
 	}
-	return ds.decodeElasticResponses(hitsToResults(res.Hits.Hits), results)
+	return ds.DecodeElasticResponses(hitsToResults(res.Hits.Hits), results)
 }
 
 func (ds *Datastore) ScriptUpdate(script string, params map[string]interface{}, filter map[string]string) error {
@@ -504,7 +522,7 @@ func (ds *Datastore) DoSearch(query elastic.Query, results interface{}, opts ...
 		return err
 	}
 
-	return ds.decodeElasticResponses(hitsToResults(res.Hits.Hits), results)
+	return ds.DecodeElasticResponses(hitsToResults(res.Hits.Hits), results)
 }
 
 func (ds *Datastore) FindByGeoBoundingBox(fieldName string, box BoundingBox, results interface{}, opts ...QueryOptFunc) error {
@@ -532,7 +550,7 @@ func (ds *Datastore) FindByGeoBoundingBox(fieldName string, box BoundingBox, res
 		return err
 	}
 
-	return ds.decodeElasticResponses(hitsToResults(res.Hits.Hits), results)
+	return ds.DecodeElasticResponses(hitsToResults(res.Hits.Hits), results)
 }
 
 func (ds *Datastore) FindByGeoDistance(fieldName string, lat float64, lon float64, distance string, results interface{}) error {
@@ -556,7 +574,7 @@ func (ds *Datastore) FindByGeoDistance(fieldName string, lat float64, lon float6
 		return err
 	}
 
-	return ds.decodeElasticResponses(hitsToResults(res.Hits.Hits), results)
+	return ds.DecodeElasticResponses(hitsToResults(res.Hits.Hits), results)
 }
 
 type QueryResult interface {
@@ -599,7 +617,7 @@ func getsToResults(gets []*elastic.GetResult) []QueryResult {
 	return res
 }
 
-func (ds *Datastore) decodeElasticResponses(qrs []QueryResult, results interface{}) error {
+func (ds *Datastore) DecodeElasticResponses(qrs []QueryResult, results interface{}) error {
 	resultsv := reflect.ValueOf(results)
 	if resultsv.Kind() != reflect.Ptr || resultsv.Elem().Kind() != reflect.Slice {
 		return errors.New("result argument must be a slice address")
@@ -610,7 +628,7 @@ func (ds *Datastore) decodeElasticResponses(qrs []QueryResult, results interface
 
 	for _, qr := range qrs {
 		elemp := reflect.New(elemt)
-		err := ds.decodeElasticResponse(qr.Source(), qr.ID(), elemp.Interface())
+		err := ds.DecodeElasticResponse(qr.Source(), qr.ID(), elemp.Interface())
 		if err != nil {
 			return err
 		}
@@ -646,7 +664,7 @@ func (ds *Datastore) getID(o interface{}) (string, error) {
 	return idField.String(), nil
 }
 
-func (ds *Datastore) decodeElasticResponse(source *json.RawMessage, ID string, o interface{}) error {
+func (ds *Datastore) DecodeElasticResponse(source *json.RawMessage, ID string, o interface{}) error {
 	if source == nil {
 		return nil
 	}
