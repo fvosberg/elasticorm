@@ -405,6 +405,46 @@ func (ds *Datastore) FindNestedFiltered(results interface{}, path string, mustFi
 	return ds.DecodeElasticResponses(hitsToResults(res.Hits.Hits), results)
 }
 
+func (ds *Datastore) FindQuery(results interface{}, q elastic.Query, opts ...QueryOptFunc) error {
+	s := ds.elasticClient.Search().
+		Index(ds.indexName).
+		Type(ds.typeName).
+		Query(q)
+
+	for _, opt := range opts {
+		err := opt(s)
+		if err != nil {
+			return err
+		}
+	}
+
+	res, err := s.Do(ds.Ctx)
+	if err != nil {
+		return err
+	}
+	return ds.DecodeElasticResponses(hitsToResults(res.Hits.Hits), results)
+}
+
+func (ds *Datastore) FindNestedQuery(results interface{}, path string, nested elastic.Query, opts ...QueryOptFunc) error {
+	q := ds.elasticClient.Search().
+		Index(ds.indexName).
+		Type(ds.typeName).
+		Query(elastic.NewNestedQuery(path, nested))
+
+	for _, opt := range opts {
+		err := opt(q)
+		if err != nil {
+			return err
+		}
+	}
+
+	res, err := q.Do(ds.Ctx)
+	if err != nil {
+		return err
+	}
+	return ds.DecodeElasticResponses(hitsToResults(res.Hits.Hits), results)
+}
+
 func (ds *Datastore) ScriptUpdate(script string, params map[string]interface{}, filter map[string]string) error {
 	_, err := ds.UpdateByQueryService().
 		Script(
