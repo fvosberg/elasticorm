@@ -26,7 +26,8 @@ type IndexSettings struct {
 }
 
 type IndexAnalysis struct {
-	Analyzer map[string]Analyzer `json:"analyzer,omitempty"`
+	Analyzer  map[string]Analyzer  `json:"analyzer,omitempty"`
+	Tokenizer map[string]Tokenizer `json:"tokenizer,omitempty"`
 }
 
 type Analyzer struct {
@@ -44,6 +45,24 @@ func (d *IndexDefinition) AddAnalyzer(name string, a Analyzer) error {
 		return fmt.Errorf("analyzer \"%s\" already set", name)
 	}
 	d.Settings.Analysis.Analyzer[name] = a
+	return nil
+}
+
+type Tokenizer struct {
+	Type       string   `json:"type"`
+	TokenChars []string `json:"token_chars,omitempty"`
+	MinGram    int      `json:"min_gram,omitempty"`
+	MaxGram    int      `json:"max_gram,omitempty"`
+}
+
+func (d *IndexDefinition) AddTokenizer(name string, t Tokenizer) error {
+	if d.Settings.Analysis.Tokenizer == nil {
+		d.Settings.Analysis.Tokenizer = map[string]Tokenizer{}
+	}
+	if _, ok := d.Settings.Analysis.Tokenizer[name]; ok {
+		return fmt.Errorf("tokenizer \"%s\" already set", name)
+	}
+	d.Settings.Analysis.Tokenizer[name] = t
 	return nil
 }
 

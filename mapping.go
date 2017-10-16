@@ -72,6 +72,7 @@ type MappingFieldConfig struct {
 	structFieldName string                        `json:"-"`
 	Properties      map[string]MappingFieldConfig `json:"properties,omitempty"`
 	Fields          map[string]MappingFieldConfig `json:"fields,omitempty"`
+	Similarity      string                        `json:"similarity,omitempty"`
 }
 
 // MappingFromStruct returns the MappingConfig for a passed in struct (pointer). The mapping is configurable via json tags, which can change the name of the field, and elasticorm tags. The elasticorm tags can include

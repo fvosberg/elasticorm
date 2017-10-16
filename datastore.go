@@ -84,18 +84,13 @@ func (ds *Datastore) EnsureIndexExists() error {
 }
 
 func (ds *Datastore) createIndex() error {
-	JSON, err := json.Marshal(ds.IndexDefinition)
-	if err != nil {
-		return err
-	}
 	ack, err := ds.elasticClient.
 		CreateIndex(ds.indexName).
-		BodyString(string(JSON)).
+		BodyJson(ds.IndexDefinition).
 		Do(ds.Ctx)
 	if err != nil || !ack.Acknowledged {
-		return errors.Wrap(
-			err, fmt.Sprintf("creating elasticsearch index %s failed - %s", ds.indexName, string(JSON)),
-		)
+		JSON, _ := json.MarshalIndent(ds.IndexDefinition, "", "\t")
+		return errors.Wrapf(err, "creating elasticsearch index %s failed - %s", ds.indexName, string(JSON))
 	}
 	return nil
 }
