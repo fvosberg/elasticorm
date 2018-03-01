@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/olivere/elastic"
 	"github.com/pkg/errors"
-	elastic "gopkg.in/olivere/elastic.v5"
 )
 
 // NewDatastore returns a fresh instance of an elasticorm datastore
@@ -210,7 +210,7 @@ func (ds *Datastore) Create(o interface{}, opts ...IndexOptFunc) error {
 	if err != nil {
 		return err
 	}
-	if !put.Created {
+	if put.Result != "created" {
 		return ErrCreationFailed
 	}
 	return ds.setID(o, put.Id)
